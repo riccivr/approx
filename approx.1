@@ -1,0 +1,84 @@
+.TH APPROX 1 approx\-VERSION
+.SH NAME
+approx \- non-interactive POSIX fuzzy stream filter and ranker
+.SH SYNOPSIS
+.B approx
+.RB [ \-isveV ]
+.RB [ \-t
+.IR threshold ]
+.RB [ \-n
+.IR count ]
+.I pattern
+.RI [ file\ ... ]
+.SH DESCRIPTION
+.B approx
+is a stream filter and ranker that scores lines against a fuzzy search
+.I pattern
+using normalized approximate string distance. It is designed for POSIX
+pipelines, shell scripts, and resource-constrained embedded systems.
+.P
+If no
+.I file
+operands are specified, or if a file operand is
+.BR \- ,
+.B approx
+reads from standard input.
+.SH OPTIONS
+.TP
+.BI \-t " threshold"
+Minimum similarity threshold between
+.B 0.00
+and
+.B 1.00
+required for a line to match. Default is
+.BR 0.70 .
+.TP
+.BI \-n " count"
+Rank and output only the top
+.I count
+lines with the highest similarity score.
+.TP
+.B \-s
+Prepend the similarity score and a tab character before each matching line.
+.TP
+.B \-i
+Match case-insensitively.
+.TP
+.B \-v
+Invert the sense of matching, selecting non-matching lines (similarity score below threshold).
+.TP
+.B \-e
+Perform exact full-line Levenshtein distance comparison rather than finding the best matching substring.
+.TP
+.B \-V
+Print version information to standard output and exit.
+.SH EXIT STATUS
+.TP
+.B 0
+At least one matching line was selected.
+.TP
+.B 1
+No lines were selected.
+.TP
+.B >1
+An error occurred (invalid arguments, unreadable file, out of memory).
+.SH EXAMPLES
+Filter log lines tolerating typos in "connection timeout":
+.IP
+.EX
+cat server.log | approx "connection timeout"
+.EE
+.P
+Find the top 5 closest matches with their scores from a wordlist:
+.IP
+.EX
+approx -n 5 -s "recieve" /usr/share/dict/words
+.EE
+.P
+Case-insensitive search with a strict 85% threshold:
+.IP
+.EX
+dmesg | approx -i -t 0.85 "out of memory"
+.EE
+.SH AUTHORS
+See the LICENSE file for authors and copyright details.

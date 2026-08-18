@@ -1,0 +1,4 @@
+approx
+*.o
+*.tar.gz
+*.tar
