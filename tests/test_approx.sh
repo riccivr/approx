@@ -168,6 +168,12 @@ run_test "UTF-8 multi-byte string handling" \
 	0 \
 	"café au lait"
 
+# Test 16: Pipeline early termination (SIGPIPE / broken pipe)
+run_test "Early pipe closure handling (e.g. head -n 1)" \
+	'yes "repeated test match line" | '"$APPROX"' "repeated" | head -n 1' \
+	0 \
+	"repeated test match line"
+
 printf "========================================\n"
 printf "Tests passed: %d, Failed: %d\n" "$PASSED" "$FAILED"
 printf "========================================\n"

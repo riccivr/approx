@@ -459,6 +459,11 @@ main(int argc, char *argv[])
 		heap_free(h);
 	}
 
+	if (fflush(stdout) == EOF || ferror(stdout)) {
+		if (errno != EPIPE)
+			die("approx: error writing stdout:");
+	}
+
 	if (err)
 		return err;
 
