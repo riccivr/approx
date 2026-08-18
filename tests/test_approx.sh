@@ -108,6 +108,8 @@ run_test "Exact full-line mode (-e) fails word in long line" \
 # Test 10: Multi-file input and stdin
 tmp1="/tmp/approx_test_1.$$"
 tmp2="/tmp/approx_test_2.$$"
+trap 'rm -f "$tmp1" "$tmp2"' EXIT INT TERM
+
 printf "alpha connection\n" > "$tmp1"
 printf "beta timeout\n" > "$tmp2"
 
@@ -121,9 +123,12 @@ run_test "Combined stdin and file arguments" \
 	0 \
 	"$(printf 'alpha connection\ngamma connection')"
 
-rm -f "$tmp1" "$tmp2"
-
 # Test 11: Error handling on invalid arguments (exit code 2)
+run_test "Non-existent file argument returns exit code 2" \
+	''"$APPROX"' "test" "/tmp/nonexistent_file_$$"' \
+	2 \
+	""
+
 run_test "Invalid threshold value returns exit code 2" \
 	''"$APPROX"' -t 1.5 "test"' \
 	2 \
