@@ -32,9 +32,19 @@ Afterwards enter the following command to build and install approx:
 
 Running tests
 -------------
-To execute the automated POSIX test suite:
+`approx` includes a multi-tiered test suite covering POSIX conformance,
+stress/fuzzing, metric mathematical properties, memory safety, and benchmarks:
 
-    make test
+    make test              # Run core unit tests
+    make test-posix        # Run IEEE 1003.1 syntax & argument parsing tests
+    make test-stress       # Run fuzzing & malformed stream tests
+    make test-properties   # Run metric invariant & symmetry tests
+    make test-all          # Run all 4 test suites (53 tests)
+    make test-valgrind     # Run leak check under Valgrind
+    make test-tcc          # Compile & test with Tiny C Compiler (tcc)
+    make test-clang        # Compile & test with Clang
+    make sanitize          # Compile & test under ASan + UBSan
+    make bench             # Run throughput benchmark (100k lines)
 
 Usage
 -----

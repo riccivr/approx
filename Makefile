@@ -55,9 +55,46 @@ uninstall:
 test: approx
 	@sh tests/test_approx.sh
 
+test-posix: approx
+	@sh tests/test_posix.sh
+
+test-stress: approx
+	@sh tests/test_stress.sh
+
+test-properties: approx
+	@sh tests/test_properties.sh
+
+test-all: test test-posix test-stress test-properties
+
+test-valgrind: clean
+	@echo building with debug symbols
+	@$(CC) $(CFLAGS) -g approx.c -o approx $(LDFLAGS)
+	@echo running valgrind leak check
+	@printf "match test line\n" | valgrind --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 ./approx "test" >/dev/null
+	@printf "apple\nrecieve\n" | valgrind --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 ./approx -n 2 -s "receive" >/dev/null
+	@echo valgrind: 0 memory leaks, 0 errors
+
+test-tcc: clean
+	@echo compiling with tcc
+	@tcc -std=c99 -D_POSIX_C_SOURCE=200809L -DVERSION=\"$(VERSION)\" approx.c -o approx -lm
+	@sh tests/test_approx.sh
+	@sh tests/test_posix.sh
+
+test-clang: clean
+	@echo compiling with clang
+	@clang -std=c99 -Wall -Wextra -pedantic -D_POSIX_C_SOURCE=200809L -DVERSION=\"$(VERSION)\" approx.c -o approx -lm
+	@sh tests/test_approx.sh
+	@sh tests/test_posix.sh
+
 sanitize: clean
 	@echo CC -fsanitize=address,undefined -o approx
 	@$(CC) $(CFLAGS) -g -fsanitize=address,undefined approx.c -o approx $(LDFLAGS) -fsanitize=address,undefined
 	@sh tests/test_approx.sh
+	@sh tests/test_posix.sh
+	@sh tests/test_stress.sh
+	@sh tests/test_properties.sh
 
-.PHONY: all options clean dist install uninstall test sanitize
+bench: approx
+	@sh tests/benchmark.sh
+
+.PHONY: all options clean dist install uninstall test test-posix test-stress test-properties test-all test-valgrind test-tcc test-clang sanitize bench
