@@ -129,6 +129,11 @@ run_test "Invalid threshold value returns exit code 2" \
 	2 \
 	""
 
+run_test "NaN threshold value returns exit code 2" \
+	''"$APPROX"' -t NaN "test"' \
+	2 \
+	""
+
 run_test "Invalid count value returns exit code 2" \
 	''"$APPROX"' -n 0 "test"' \
 	2 \

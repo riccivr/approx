@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <math.h>
 
 #include "arg.h"
 #include "approx.h"
@@ -371,8 +372,8 @@ main(int argc, char *argv[])
 		char *s = EARGF(usage());
 		char *end;
 		threshold = strtod(s, &end);
-		if (*end != '\0' || threshold < 0.0 || threshold > 1.0)
-			die("approx: invalid threshold: %s (must be 0.0 to 1.0)", s);
+		if (*end != '\0' || isnan(threshold) || threshold < 0.0 || threshold > 1.0)
+			die("approx: invalid threshold: %s (must be between 0.0 and 1.0)", s);
 		break;
 	}
 	case 'n': {
