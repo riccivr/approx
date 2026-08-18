@@ -74,8 +74,9 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 	size_t buf_a[256], buf_b[256];
 	size_t *prev, *curr, *tmp;
 	size_t *alloc_a = NULL, *alloc_b = NULL;
-	size_t min_dist;
+	size_t min_dist, cost;
 	size_t i, j;
+	char c;
 
 	if (patlen == 0)
 		return 1.0;
@@ -106,11 +107,11 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 	min_dist = patlen;
 
 	for (j = 0; j < linelen; j++) {
-		char c = line[j];
+		c = line[j];
 		curr[0] = 0;
 
 		for (i = 1; i <= patlen; i++) {
-			size_t cost = char_eq(pat[i - 1], c, icase) ? 0 : 1;
+			cost = char_eq(pat[i - 1], c, icase) ? 0 : 1;
 			curr[i] = min3(curr[i - 1] + 1,
 			               prev[i] + 1,
 			               prev[i - 1] + cost);
@@ -141,8 +142,9 @@ sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int 
 	size_t buf_a[256], buf_b[256];
 	size_t *prev, *curr, *tmp;
 	size_t *alloc_a = NULL, *alloc_b = NULL;
-	size_t dist;
-	size_t max_len, i, j;
+	size_t dist, max_len, cost;
+	size_t i, j;
+	char c;
 
 	if (patlen == 0 && linelen == 0)
 		return 1.0;
@@ -171,11 +173,11 @@ sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int 
 		prev[i] = i;
 
 	for (j = 0; j < linelen; j++) {
-		char c = line[j];
+		c = line[j];
 		curr[0] = j + 1;
 
 		for (i = 1; i <= patlen; i++) {
-			size_t cost = char_eq(pat[i - 1], c, icase) ? 0 : 1;
+			cost = char_eq(pat[i - 1], c, icase) ? 0 : 1;
 			curr[i] = min3(curr[i - 1] + 1,
 			               prev[i] + 1,
 			               prev[i - 1] + cost);
@@ -240,10 +242,13 @@ heap_free(struct heap *h)
 static void
 sift_up(struct heap *h, size_t idx)
 {
+	struct match_item tmp;
+	size_t parent;
+
 	while (idx > 0) {
-		size_t parent = (idx - 1) / 2;
+		parent = (idx - 1) / 2;
 		if (h->items[idx].score < h->items[parent].score) {
-			struct match_item tmp = h->items[idx];
+			tmp = h->items[idx];
 			h->items[idx] = h->items[parent];
 			h->items[parent] = tmp;
 			idx = parent;
@@ -256,9 +261,12 @@ sift_up(struct heap *h, size_t idx)
 static void
 sift_down(struct heap *h, size_t idx)
 {
-	size_t smallest = idx;
-	size_t left = 2 * idx + 1;
-	size_t right = 2 * idx + 2;
+	struct match_item tmp;
+	size_t smallest, left, right;
+
+	smallest = idx;
+	left = 2 * idx + 1;
+	right = 2 * idx + 2;
 
 	if (left < h->size && h->items[left].score < h->items[smallest].score)
 		smallest = left;
@@ -266,7 +274,7 @@ sift_down(struct heap *h, size_t idx)
 		smallest = right;
 
 	if (smallest != idx) {
-		struct match_item tmp = h->items[idx];
+		tmp = h->items[idx];
 		h->items[idx] = h->items[smallest];
 		h->items[smallest] = tmp;
 		sift_down(h, smallest);
@@ -326,14 +334,12 @@ process_stream(FILE *fp, const char *pat, size_t patlen, struct heap *h)
 	char *line = NULL;
 	size_t linecap = 0;
 	ssize_t linelen;
-	size_t lineno = 0;
-	int matched = 0;
+	size_t lineno = 0, len;
+	double score;
+	int matched = 0, is_match;
 
 	while ((linelen = getline(&line, &linecap, fp)) >= 0) {
-		double score;
-		int is_match;
-		size_t len = (size_t)linelen;
-
+		len = (size_t)linelen;
 		lineno++;
 
 		/* Strip trailing newline and CR for similarity calculation */
@@ -368,29 +374,25 @@ process_stream(FILE *fp, const char *pat, size_t patlen, struct heap *h)
 int
 main(int argc, char *argv[])
 {
-	char *pat;
-	size_t patlen;
+	FILE *fp;
+	char *pat, *s, *end;
+	size_t patlen, i;
 	struct heap *h = NULL;
-	int matched = 0;
-	int err = 0;
+	int matched = 0, err = 0;
 
 	ARGBEGIN {
-	case 't': {
-		char *s = EARGF(usage());
-		char *end;
+	case 't':
+		s = EARGF(usage());
 		threshold = strtod(s, &end);
 		if (*end != '\0' || isnan(threshold) || threshold < 0.0 || threshold > 1.0)
 			die("approx: invalid threshold: %s (must be between 0.0 and 1.0)", s);
 		break;
-	}
-	case 'n': {
-		char *s = EARGF(usage());
-		char *end;
+	case 'n':
+		s = EARGF(usage());
 		opt_topn = strtol(s, &end, 10);
 		if (*end != '\0' || opt_topn <= 0)
 			die("approx: invalid count: %s", s);
 		break;
-	}
 	case 's':
 		opt_score = 1;
 		break;
@@ -425,9 +427,7 @@ main(int argc, char *argv[])
 		if (process_stream(stdin, pat, patlen, h))
 			matched = 1;
 	} else {
-		int i;
-		for (i = 0; i < argc; i++) {
-			FILE *fp;
+		for (i = 0; i < (size_t)argc; i++) {
 			if (strcmp(argv[i], "-") == 0) {
 				fp = stdin;
 			} else {
@@ -448,7 +448,6 @@ main(int argc, char *argv[])
 	}
 
 	if (h) {
-		size_t i;
 		heap_sort_descending(h);
 		for (i = 0; i < h->size; i++) {
 			if (opt_score)

@@ -8,7 +8,9 @@
 
 #include <stddef.h>
 
+#ifndef VERSION
 #define VERSION "1.0"
+#endif
 #define DEFAULT_THRESHOLD 0.70
 
 struct match_item {
