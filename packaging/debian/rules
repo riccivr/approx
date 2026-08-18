@@ -1,0 +1,12 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_build:
+	$(MAKE)
+
+override_dh_auto_test:
+	$(MAKE) test-all
+
+override_dh_auto_install:
+	$(MAKE) PREFIX=/usr MANPREFIX=/usr/share/man DESTDIR=debian/approx install

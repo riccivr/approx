@@ -1,0 +1,15 @@
+pkgbase = approx
+	pkgdesc = Non-interactive POSIX fuzzy stream filter and ranker in clean C
+	pkgver = 1.0.0
+	pkgrel = 1
+	url = https://github.com/riccivr/approx
+	arch = x86_64
+	arch = aarch64
+	arch = armv7h
+	arch = i686
+	license = ISC
+	depends = glibc
+	source = approx-1.0.0.tar.gz::https://github.com/riccivr/approx/archive/refs/tags/v1.0.0.tar.gz
+	sha256sums = SKIP
+
+pkgname = approx

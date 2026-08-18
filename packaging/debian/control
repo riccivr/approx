@@ -1,0 +1,15 @@
+Source: approx
+Section: utils
+Priority: optional
+Maintainer: Ricardo Veronese Ricci <ricci.vr@gmail.com>
+Build-Depends: debhelper-compat (= 13), build-essential
+Standards-Version: 4.6.0
+Homepage: https://github.com/riccivr/approx
+
+Package: approx
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Non-interactive POSIX fuzzy stream filter and ranker
+ approx is a lightweight, zero-dependency POSIX CLI utility that scores,
+ filters, and ranks streaming text using normalized approximate string distance.
+ Built for automated UNIX pipelines, shell scripts, and embedded systems.
