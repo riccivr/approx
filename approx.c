@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <math.h>
 
 #include "arg.h"
@@ -52,10 +53,10 @@ usage(void)
 	exit(2);
 }
 
-static inline int
-min3(int a, int b, int c)
+static inline size_t
+min3(size_t a, size_t b, size_t c)
 {
-	int m = a < b ? a : b;
+	size_t m = a < b ? a : b;
 	return m < c ? m : c;
 }
 
@@ -70,10 +71,10 @@ char_eq(char a, char b, int icase)
 double
 sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int icase)
 {
-	int buf_a[256], buf_b[256];
-	int *prev, *curr, *tmp;
-	int *alloc_a = NULL, *alloc_b = NULL;
-	int min_dist;
+	size_t buf_a[256], buf_b[256];
+	size_t *prev, *curr, *tmp;
+	size_t *alloc_a = NULL, *alloc_b = NULL;
+	size_t min_dist;
 	size_t i, j;
 
 	if (patlen == 0)
@@ -81,12 +82,15 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 	if (linelen == 0)
 		return 0.0;
 
+	if (patlen > SIZE_MAX / sizeof(size_t) - 1)
+		die("approx: pattern length exceeds maximum supported size");
+
 	if (patlen + 1 <= sizeof(buf_a) / sizeof(buf_a[0])) {
 		prev = buf_a;
 		curr = buf_b;
 	} else {
-		alloc_a = malloc((patlen + 1) * sizeof(int));
-		alloc_b = malloc((patlen + 1) * sizeof(int));
+		alloc_a = malloc((patlen + 1) * sizeof(size_t));
+		alloc_b = malloc((patlen + 1) * sizeof(size_t));
 		if (!alloc_a || !alloc_b) {
 			free(alloc_a);
 			free(alloc_b);
@@ -97,16 +101,16 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 	}
 
 	for (i = 0; i <= patlen; i++)
-		prev[i] = (int)i;
+		prev[i] = i;
 
-	min_dist = (int)patlen;
+	min_dist = patlen;
 
 	for (j = 0; j < linelen; j++) {
 		char c = line[j];
 		curr[0] = 0;
 
 		for (i = 1; i <= patlen; i++) {
-			int cost = char_eq(pat[i - 1], c, icase) ? 0 : 1;
+			size_t cost = char_eq(pat[i - 1], c, icase) ? 0 : 1;
 			curr[i] = min3(curr[i - 1] + 1,
 			               prev[i] + 1,
 			               prev[i - 1] + cost);
@@ -125,7 +129,7 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 		free(alloc_b);
 	}
 
-	if (min_dist >= (int)patlen)
+	if (min_dist >= patlen)
 		return 0.0;
 
 	return 1.0 - ((double)min_dist / (double)patlen);
@@ -134,10 +138,10 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 double
 sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int icase)
 {
-	int buf_a[256], buf_b[256];
-	int *prev, *curr, *tmp;
-	int *alloc_a = NULL, *alloc_b = NULL;
-	int dist;
+	size_t buf_a[256], buf_b[256];
+	size_t *prev, *curr, *tmp;
+	size_t *alloc_a = NULL, *alloc_b = NULL;
+	size_t dist;
 	size_t max_len, i, j;
 
 	if (patlen == 0 && linelen == 0)
@@ -145,12 +149,15 @@ sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int 
 	if (patlen == 0 || linelen == 0)
 		return 0.0;
 
+	if (patlen > SIZE_MAX / sizeof(size_t) - 1)
+		die("approx: pattern length exceeds maximum supported size");
+
 	if (patlen + 1 <= sizeof(buf_a) / sizeof(buf_a[0])) {
 		prev = buf_a;
 		curr = buf_b;
 	} else {
-		alloc_a = malloc((patlen + 1) * sizeof(int));
-		alloc_b = malloc((patlen + 1) * sizeof(int));
+		alloc_a = malloc((patlen + 1) * sizeof(size_t));
+		alloc_b = malloc((patlen + 1) * sizeof(size_t));
 		if (!alloc_a || !alloc_b) {
 			free(alloc_a);
 			free(alloc_b);
@@ -161,14 +168,14 @@ sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int 
 	}
 
 	for (i = 0; i <= patlen; i++)
-		prev[i] = (int)i;
+		prev[i] = i;
 
 	for (j = 0; j < linelen; j++) {
 		char c = line[j];
-		curr[0] = (int)(j + 1);
+		curr[0] = j + 1;
 
 		for (i = 1; i <= patlen; i++) {
-			int cost = char_eq(pat[i - 1], c, icase) ? 0 : 1;
+			size_t cost = char_eq(pat[i - 1], c, icase) ? 0 : 1;
 			curr[i] = min3(curr[i - 1] + 1,
 			               prev[i] + 1,
 			               prev[i - 1] + cost);
@@ -187,7 +194,7 @@ sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int 
 	}
 
 	max_len = patlen > linelen ? patlen : linelen;
-	if (dist >= (int)max_len)
+	if (dist >= max_len)
 		return 0.0;
 
 	return 1.0 - ((double)dist / (double)max_len);
@@ -198,8 +205,8 @@ heap_create(size_t cap)
 {
 	struct heap *h;
 
-	if (cap == 0)
-		return NULL;
+	if (cap == 0 || cap > SIZE_MAX / sizeof(h->items[0]))
+		die("approx: count value exceeds maximum supported size");
 
 	h = malloc(sizeof(*h));
 	if (!h)
