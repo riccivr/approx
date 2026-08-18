@@ -39,4 +39,8 @@ uninstall:
 test: approx
 	sh tests/test_approx.sh
 
-.PHONY: all clean dist install uninstall test
+sanitize: clean
+	$(CC) $(CFLAGS) -g -fsanitize=address,undefined approx.c -o approx $(LDFLAGS) -fsanitize=address,undefined
+	sh tests/test_approx.sh
+
+.PHONY: all clean dist install uninstall test sanitize
