@@ -18,6 +18,56 @@
 #include "arg.h"
 #include "approx.h"
 
+#if defined(_WIN32) || defined(_WIN64)
+static ssize_t
+portable_getline(char **lineptr, size_t *n, FILE *stream)
+{
+	char *buf;
+	size_t pos = 0;
+	int c;
+
+	if (!lineptr || !n || !stream) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!*lineptr || *n == 0) {
+		*n = 128;
+		*lineptr = malloc(*n);
+		if (!*lineptr) {
+			errno = ENOMEM;
+			return -1;
+		}
+	}
+
+	buf = *lineptr;
+
+	while ((c = fgetc(stream)) != EOF) {
+		if (pos + 2 >= *n) {
+			size_t new_size = *n * 2;
+			char *new_buf = realloc(*lineptr, new_size);
+			if (!new_buf) {
+				errno = ENOMEM;
+				return -1;
+			}
+			*lineptr = new_buf;
+			*n = new_size;
+			buf = *lineptr;
+		}
+		buf[pos++] = (char)c;
+		if (c == '\n')
+			break;
+	}
+
+	if (pos == 0 && c == EOF)
+		return -1;
+
+	buf[pos] = '\0';
+	return (ssize_t)pos;
+}
+#define getline portable_getline
+#endif
+
 char *argv0;
 
 static double threshold = DEFAULT_THRESHOLD;

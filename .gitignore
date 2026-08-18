@@ -1,4 +1,7 @@
 approx
+approx.exe
 *.o
 *.tar.gz
 *.tar
+*.zip
+release_dist/

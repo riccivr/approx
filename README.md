@@ -90,7 +90,7 @@ with every GitHub release:
 * **macOS (Universal x86_64 + Apple Silicon ARM64)**: `approx-darwin-universal.tar.gz`
 * **Windows (x86_64)**: `approx-windows-amd64.zip`
 
-👉 Download from **[GitHub Releases](https://github.com/riccivr/approx/releases)**
+Download from **[GitHub Releases](https://github.com/riccivr/approx/releases)**
 
 Running tests
 -------------
