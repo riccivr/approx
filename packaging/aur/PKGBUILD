@@ -2,7 +2,7 @@
 pkgname=approx
 pkgver=1.0.0
 pkgrel=1
-pkgdesc="Non-interactive POSIX fuzzy stream filter and ranker in clean C"
+pkgdesc="Non-interactive fuzzy stream filter and ranker"
 arch=('x86_64' 'aarch64' 'armv7h' 'i686')
 url="https://github.com/riccivr/approx"
 license=('ISC')

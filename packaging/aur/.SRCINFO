@@ -1,5 +1,5 @@
 pkgbase = approx
-	pkgdesc = Non-interactive POSIX fuzzy stream filter and ranker in clean C
+	pkgdesc = Non-interactive fuzzy stream filter and ranker
 	pkgver = 1.0.0
 	pkgrel = 1
 	url = https://github.com/riccivr/approx

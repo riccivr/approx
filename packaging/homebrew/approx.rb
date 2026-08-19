@@ -1,5 +1,5 @@
 class Approx < Formula
-  desc "Non-interactive POSIX fuzzy stream filter and ranker in clean C"
+  desc "Non-interactive fuzzy stream filter and ranker"
   homepage "https://github.com/riccivr/approx"
   url "https://github.com/riccivr/approx/archive/refs/tags/v1.0.0.tar.gz"
   sha256 "SKIP" # Replace with tag tarball sha256

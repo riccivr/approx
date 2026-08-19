@@ -8,8 +8,8 @@
     <projectUrl>https://github.com/riccivr/approx</projectUrl>
     <licenseUrl>https://github.com/riccivr/approx/blob/main/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <description>Non-interactive POSIX fuzzy stream filter and ranker in clean C with zero dependencies.</description>
-    <summary>POSIX fuzzy stream filter and ranker</summary>
+    <description>Non-interactive fuzzy stream filter and ranker.</description>
+    <summary>Fuzzy stream filter and ranker</summary>
     <tags>approx fuzzy grep search filter cli suckless posix</tags>
   </metadata>
   <files>

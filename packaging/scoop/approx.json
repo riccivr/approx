@@ -1,6 +1,6 @@
 {
     "version": "1.0.0",
-    "description": "Non-interactive POSIX fuzzy stream filter and ranker in clean C",
+    "description": "Non-interactive fuzzy stream filter and ranker",
     "homepage": "https://github.com/riccivr/approx",
     "license": "ISC",
     "architecture": {
