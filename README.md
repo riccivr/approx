@@ -7,6 +7,8 @@ matches to standard output.
 It runs non-interactively in standard shell pipelines without external
 dependencies.
 
+![Demo](assets/demo.gif)
+
 Features
 --------
 * Strict C99 and standard POSIX libc headers only.
