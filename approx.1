@@ -1,6 +1,6 @@
 .TH APPROX 1 approx\-VERSION
 .SH NAME
-approx \- non-interactive POSIX fuzzy stream filter and ranker
+approx \- non-interactive fuzzy stream filter and ranker
 .SH SYNOPSIS
 .B approx
 .RB [ \-isveV ]
@@ -12,10 +12,9 @@ approx \- non-interactive POSIX fuzzy stream filter and ranker
 .RI [ file\ ... ]
 .SH DESCRIPTION
 .B approx
-is a stream filter and ranker that scores lines against a fuzzy search
+filters and ranks text lines by comparing them against a search
 .I pattern
-using normalized approximate string distance. It is designed for POSIX
-pipelines, shell scripts, and resource-constrained embedded systems.
+using approximate string matching.
 .P
 If no
 .I file
@@ -26,17 +25,17 @@ reads from standard input.
 .SH OPTIONS
 .TP
 .BI \-t " threshold"
-Minimum similarity threshold between
+Minimum similarity score between
 .B 0.00
 and
 .B 1.00
-required for a line to match. Default is
+for a line to match. Default is
 .BR 0.70 .
 .TP
 .BI \-n " count"
-Rank and output only the top
+Output only the top
 .I count
-lines with the highest similarity score.
+lines sorted by highest similarity score.
 .TP
 .B \-s
 Prepend the similarity score and a tab character before each matching line.
@@ -45,10 +44,10 @@ Prepend the similarity score and a tab character before each matching line.
 Match case-insensitively.
 .TP
 .B \-v
-Invert the sense of matching, selecting non-matching lines (similarity score below threshold).
+Invert match, selecting lines with scores below the threshold.
 .TP
 .B \-e
-Perform exact full-line Levenshtein distance comparison rather than finding the best matching substring.
+Compare full lines instead of finding the best matching substring.
 .TP
 .B \-V
 Print version information to standard output and exit.
@@ -61,21 +60,21 @@ At least one matching line was selected.
 No lines were selected.
 .TP
 .B >1
-An error occurred (invalid arguments, unreadable file, out of memory).
+An error occurred.
 .SH EXAMPLES
-Filter log lines tolerating typos in "connection timeout":
+Filter log lines for typos in "connection timeout":
 .IP
 .EX
 cat server.log | approx "connection timeout"
 .EE
 .P
-Find the top 5 closest matches with their scores from a wordlist:
+Find the top 5 closest matches from a wordlist:
 .IP
 .EX
 approx -n 5 -s "recieve" /usr/share/dict/words
 .EE
 .P
-Case-insensitive search with a strict 85% threshold:
+Case-insensitive search with an 85% threshold:
 .IP
 .EX
 dmesg | approx -i -t 0.85 "out of memory"
