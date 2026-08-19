@@ -1,5 +1,5 @@
 /*
- * approx - non-interactive POSIX fuzzy stream filter and ranker
+ * approx - non-interactive fuzzy stream filter
  * See LICENSE file for copyright and license details.
  */
 
@@ -134,7 +134,7 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 		return 0.0;
 
 	if (patlen > SIZE_MAX / sizeof(size_t) - 1)
-		die("approx: pattern length exceeds maximum supported size");
+		die("approx: pattern too long");
 
 	if (patlen + 1 <= sizeof(buf_a) / sizeof(buf_a[0])) {
 		prev = buf_a;
@@ -202,7 +202,7 @@ sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int 
 		return 0.0;
 
 	if (patlen > SIZE_MAX / sizeof(size_t) - 1)
-		die("approx: pattern length exceeds maximum supported size");
+		die("approx: pattern too long");
 
 	if (patlen + 1 <= sizeof(buf_a) / sizeof(buf_a[0])) {
 		prev = buf_a;
@@ -258,7 +258,7 @@ heap_create(size_t cap)
 	struct heap *h;
 
 	if (cap == 0 || cap > SIZE_MAX / sizeof(h->items[0]))
-		die("approx: count value exceeds maximum supported size");
+		die("approx: count too large");
 
 	h = malloc(sizeof(*h));
 	if (!h)
@@ -392,7 +392,7 @@ process_stream(FILE *fp, const char *pat, size_t patlen, struct heap *h)
 		len = (size_t)linelen;
 		lineno++;
 
-		/* Strip trailing newline and CR for similarity calculation */
+		/* strip trailing newline and cr */
 		while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
 			line[--len] = '\0';
 
@@ -435,7 +435,7 @@ main(int argc, char *argv[])
 		s = EARGF(usage());
 		threshold = strtod(s, &end);
 		if (*end != '\0' || isnan(threshold) || threshold < 0.0 || threshold > 1.0)
-			die("approx: invalid threshold: %s (must be between 0.0 and 1.0)", s);
+			die("approx: invalid threshold: %s (must be 0.0 to 1.0)", s);
 		break;
 	case 'n':
 		s = EARGF(usage());
@@ -510,7 +510,7 @@ main(int argc, char *argv[])
 
 	if (fflush(stdout) == EOF || ferror(stdout)) {
 		if (errno != EPIPE)
-			die("approx: error writing stdout:");
+			die("approx: stdout:");
 	}
 
 	if (err)

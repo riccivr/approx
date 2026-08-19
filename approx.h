@@ -1,5 +1,5 @@
 /*
- * approx - non-interactive POSIX fuzzy stream filter and ranker
+ * approx - non-interactive fuzzy stream filter
  * See LICENSE file for copyright and license details.
  */
 
@@ -25,11 +25,11 @@ struct heap {
 	size_t cap;
 };
 
-/* Similarity functions */
+/* string matching */
 double sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int icase);
 double sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int icase);
 
-/* Priority queue / heap for top-N ranking */
+/* top-n heap */
 struct heap *heap_create(size_t cap);
 void heap_free(struct heap *h);
 void heap_push(struct heap *h, double score, const char *line, size_t lineno);

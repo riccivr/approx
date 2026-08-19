@@ -1,4 +1,4 @@
-# approx - non-interactive POSIX fuzzy stream filter and ranker
+# approx - non-interactive fuzzy stream filter
 # See LICENSE file for copyright and license details.
 
 include config.mk
