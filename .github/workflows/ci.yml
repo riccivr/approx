@@ -10,6 +10,7 @@ jobs:
   test-unix:
     name: Test on ${{ matrix.os }} (${{ matrix.compiler }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -33,6 +34,7 @@ jobs:
   test-windows:
     name: Test on Windows (MSYS2 MinGW)
     runs-on: windows-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

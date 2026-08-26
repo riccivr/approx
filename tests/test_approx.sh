@@ -15,6 +15,8 @@ run_test() {
 
 	actual_output=$(eval "$cmd" 2>/dev/null)
 	status=$?
+	actual_output=$(printf '%s' "$actual_output" | tr -d '\r')
+	expected_output=$(printf '%s' "$expected_output" | tr -d '\r')
 
 	if [ "$status" -ne "$expected_status" ]; then
 		printf "[FAIL] %s (expected exit status %d, got %d)\n" "$desc" "$expected_status" "$status"
@@ -175,7 +177,7 @@ run_test "UTF-8 multi-byte string handling" \
 
 # Test 16: Pipeline early termination (SIGPIPE / broken pipe)
 run_test "Early pipe closure handling (e.g. head -n 1)" \
-	'yes "repeated test match line" | '"$APPROX"' "repeated" | head -n 1' \
+	'printf "repeated test match line\nrepeated test match line\nrepeated test match line\n" | '"$APPROX"' "repeated" | head -n 1' \
 	0 \
 	"repeated test match line"
 

@@ -19,6 +19,8 @@ run_test() {
 
 	actual_output=$(eval "$cmd" 2>/dev/null)
 	status=$?
+	actual_output=$(printf '%s' "$actual_output" | tr -d '\r')
+	expected_output=$(printf '%s' "$expected_output" | tr -d '\r')
 
 	if [ "$status" -ne "$expected_status" ]; then
 		printf "[FAIL] %s (expected exit status %d, got %d)\n" "$desc" "$expected_status" "$status"
