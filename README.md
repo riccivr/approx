@@ -7,7 +7,7 @@ matches to standard output.
 It runs non-interactively in standard shell pipelines without external
 dependencies.
 
-[![Demo](assets/demo.gif)](https://asciinema.org/a/8AfjhStzwxB3NeRO)
+[![Demo](assets/demo.gif)](https://asciinema.org/a/5epMdgc4RpC4G3OB)
 
 Features
 --------
