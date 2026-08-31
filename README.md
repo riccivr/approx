@@ -5,13 +5,15 @@ from standard input or files, scores lines against a pattern, and writes
 matches to standard output.
 
 It runs non-interactively in standard shell pipelines without external
-dependencies.
+dependencies, and can also be embedded directly as an `stb`-style single-header
+C/C++ library (`approx.h`).
 
 [![Demo](assets/demo.gif)](https://asciinema.org/a/tVerOgwr5zF6CJGM)
 
 Features
 --------
 * Strict C99 and standard POSIX libc headers only.
+* Single-header library (`approx.h`): drop into any C or C++ project without build dependencies.
 * Low memory use: dynamic programming table uses memory proportional to pattern length, not line length.
 * Streams line by line without loading the input into memory.
 * Bounded min-heap for top-N ranking.
@@ -21,6 +23,42 @@ Features
 * Multi-pattern search from files.
 * ANSI color match highlighting.
 * Works on Linux, macOS, BSD, and Windows.
+
+C / C++ Library (`approx.h`)
+----------------------------
+`approx.h` is an `stb`-style single-header library. To use it, drop `approx.h` into your project.
+
+In **exactly one** `.c` or `.cpp` file:
+```c
+#define APPROX_IMPLEMENTATION
+#include "approx.h"
+```
+
+In other files, simply `#include "approx.h"`.
+
+### Example
+
+```c
+#define APPROX_IMPLEMENTATION
+#include "approx.h"
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const char *query = "receive";
+    const char *target = "recieve";
+    size_t start = 0, end = 0;
+
+    /* Damerau-Levenshtein similarity with span tracking */
+    double score = approx_sim_span(query, strlen(query),
+                                   target, strlen(target),
+                                   APPROX_DAMERAU,
+                                   &start, &end);
+
+    printf("Similarity: %.2f (span: %zu..%zu)\n", score, start, end);
+    return 0;
+}
+```
 
 Installation
 ------------
@@ -79,12 +117,14 @@ Download from [GitHub Releases](https://github.com/riccivr/approx/releases)
 Running tests
 -------------
 The test suite covers unit tests, POSIX argument parsing, malformed streams,
-metric invariants, sanitizers, and throughput:
+metric invariants, C/C++ embedding, sanitizers, and throughput:
 
     make test              # Core unit tests
     make test-posix        # POSIX argument parsing tests
     make test-stress       # Fuzzing and stream edge cases
     make test-properties   # Mathematical invariant tests
+    make test-examples     # C library embedding test
+    make test-cpp          # C++ library embedding test
     make test-all          # Run all test suites
     make test-valgrind     # Memory leak check under Valgrind
     make test-tcc          # Build and test with tcc

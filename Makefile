@@ -30,8 +30,8 @@ clean:
 
 dist: clean
 	@echo creating dist tarball
-	@mkdir -p approx-$(VERSION)/tests
-	@cp -R LICENSE Makefile README.md config.mk approx.1 arg.h approx.h approx.c tests approx-$(VERSION)
+	@mkdir -p approx-$(VERSION)/tests approx-$(VERSION)/examples
+	@cp -R LICENSE Makefile README.md config.mk approx.1 arg.h approx.h approx.c tests examples approx-$(VERSION)
 	@tar -cf approx-$(VERSION).tar approx-$(VERSION)
 	@gzip approx-$(VERSION).tar
 	@rm -rf approx-$(VERSION)
@@ -64,7 +64,7 @@ test-stress: approx
 test-properties: approx
 	@sh tests/test_properties.sh
 
-test-all: test test-posix test-stress test-properties
+test-all: test test-posix test-stress test-properties test-examples test-cpp
 
 test-valgrind: clean
 	@echo building with debug symbols
@@ -94,7 +94,21 @@ sanitize: clean
 	@sh tests/test_stress.sh
 	@sh tests/test_properties.sh
 
+test-cpp: clean
+	@echo compiling C++ test
+	@$${CXX:-c++} -std=c++11 -Wall -Wextra -pedantic -I. examples/embed_demo_cpp.cpp -o examples/embed_demo_cpp
+	@./examples/embed_demo_cpp >/dev/null
+	@rm -f examples/embed_demo_cpp
+	@echo "C++ embedding test passed"
+
+test-examples: clean
+	@echo compiling C example
+	@$(CC) $(CFLAGS) -I. examples/embed_demo.c -o examples/embed_demo $(LDFLAGS)
+	@./examples/embed_demo >/dev/null
+	@rm -f examples/embed_demo
+	@echo "C embedding test passed"
+
 bench: approx
 	@sh tests/benchmark.sh
 
-.PHONY: all options clean dist install uninstall test test-posix test-stress test-properties test-all test-valgrind test-tcc test-clang sanitize bench
+.PHONY: all options clean dist install uninstall test test-posix test-stress test-properties test-all test-valgrind test-tcc test-clang test-cpp test-examples sanitize bench
