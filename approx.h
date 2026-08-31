@@ -88,7 +88,8 @@ APPROXDEF void approx_heap_sort(approx_heap_t *h);
 
 #endif /* APPROX_H */
 
-#ifdef APPROX_IMPLEMENTATION
+#if defined(APPROX_IMPLEMENTATION) && !defined(APPROX_IMPLEMENTATION_INCLUDED)
+#define APPROX_IMPLEMENTATION_INCLUDED
 
 #include <stdlib.h>
 #include <string.h>
