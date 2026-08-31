@@ -75,7 +75,10 @@ static int opt_score = 0;
 static int opt_icase = 0;
 static int opt_invert = 0;
 static int opt_exact = 0;
+static int opt_quiet = 0;
+static int opt_count = 0;
 static long opt_topn = 0;
+static long opt_max = 0;
 
 static void
 die(const char *fmt, ...)
@@ -99,7 +102,7 @@ die(const char *fmt, ...)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-isveV] [-t threshold] [-n count] pattern [file ...]\n", argv0);
+	fprintf(stderr, "usage: %s [-ceimqsvV] [-t threshold] [-n count] [-m max] pattern [file ...]\n", argv0);
 	exit(2);
 }
 
@@ -379,12 +382,12 @@ heap_sort_descending(struct heap *h)
 }
 
 static int
-process_stream(FILE *fp, const char *pat, size_t patlen, struct heap *h)
+process_stream(FILE *fp, const char *pat, size_t patlen, struct heap *h, size_t *count_out)
 {
 	char *line = NULL;
 	size_t linecap = 0;
 	ssize_t linelen;
-	size_t lineno = 0, len;
+	size_t lineno = 0, len, matched_count = 0;
 	double score;
 	int matched = 0, is_match;
 
@@ -403,21 +406,28 @@ process_stream(FILE *fp, const char *pat, size_t patlen, struct heap *h)
 
 		is_match = opt_invert ? (score < threshold) : (score >= threshold);
 
-		if (h) {
-			if (is_match) {
-				heap_push(h, score, line, lineno);
-				matched = 1;
-			}
-		} else if (is_match) {
+		if (is_match) {
 			matched = 1;
-			if (opt_score)
-				printf("%.2f\t%s\n", score, line);
-			else
-				puts(line);
+			matched_count++;
+			if (opt_quiet)
+				break;
+			if (!opt_count) {
+				if (h) {
+					heap_push(h, score, line, lineno);
+				} else if (opt_score) {
+					printf("%.2f\t%s\n", score, line);
+				} else {
+					puts(line);
+				}
+			}
+			if (opt_max > 0 && matched_count >= (size_t)opt_max)
+				break;
 		}
 	}
 
 	free(line);
+	if (count_out)
+		*count_out = matched_count;
 	return matched;
 }
 
@@ -426,11 +436,23 @@ main(int argc, char *argv[])
 {
 	FILE *fp;
 	char *pat, *s, *end;
-	size_t patlen, i;
+	size_t patlen, i, cur_count, total_count = 0;
 	struct heap *h = NULL;
 	int matched = 0, err = 0;
 
 	ARGBEGIN {
+	case 'c':
+		opt_count = 1;
+		break;
+	case 'q':
+		opt_quiet = 1;
+		break;
+	case 'm':
+		s = EARGF(usage());
+		opt_max = strtol(s, &end, 10);
+		if (*end != '\0' || opt_max <= 0)
+			die("approx: invalid count: %s", s);
+		break;
 	case 't':
 		s = EARGF(usage());
 		threshold = strtod(s, &end);
@@ -470,12 +492,13 @@ main(int argc, char *argv[])
 	argc--;
 	argv++;
 
-	if (opt_topn > 0)
+	if (opt_topn > 0 && !opt_quiet && !opt_count)
 		h = heap_create((size_t)opt_topn);
 
 	if (argc == 0) {
-		if (process_stream(stdin, pat, patlen, h))
+		if (process_stream(stdin, pat, patlen, h, &cur_count))
 			matched = 1;
+		total_count += cur_count;
 	} else {
 		for (i = 0; i < (size_t)argc; i++) {
 			if (strcmp(argv[i], "-") == 0) {
@@ -489,11 +512,15 @@ main(int argc, char *argv[])
 				}
 			}
 
-			if (process_stream(fp, pat, patlen, h))
+			if (process_stream(fp, pat, patlen, h, &cur_count))
 				matched = 1;
+			total_count += cur_count;
 
 			if (fp != stdin)
 				fclose(fp);
+
+			if (opt_quiet && matched)
+				break;
 		}
 	}
 
@@ -507,6 +534,9 @@ main(int argc, char *argv[])
 		}
 		heap_free(h);
 	}
+
+	if (opt_count && !opt_quiet)
+		printf("%zu\n", total_count);
 
 	if (fflush(stdout) == EOF || ferror(stdout)) {
 		if (errno != EPIPE)
