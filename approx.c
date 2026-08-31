@@ -82,6 +82,8 @@ static int opt_files_without_matches = 0;
 static int opt_header = -1;
 static long opt_topn = 0;
 static long opt_max = 0;
+static char opt_delim = '\0';
+static long opt_field = 0;
 
 static void
 die(const char *fmt, ...)
@@ -105,8 +107,54 @@ die(const char *fmt, ...)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-cehHilLmqsvV] [-t threshold] [-n count] [-m max] pattern [file ...]\n", argv0);
+	fprintf(stderr, "usage: %s [-cehHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] pattern [file ...]\n", argv0);
 	exit(2);
+}
+
+static void
+extract_field(const char *line, size_t linelen, char delim, long k, const char **fstart, size_t *flen)
+{
+	size_t i = 0, field_idx = 1, start = 0;
+
+	if (k <= 0) {
+		*fstart = line;
+		*flen = linelen;
+		return;
+	}
+
+	if (delim != '\0') {
+		while (i <= linelen) {
+			if (i == linelen || line[i] == delim) {
+				if (field_idx == (size_t)k) {
+					*fstart = line + start;
+					*flen = i - start;
+					return;
+				}
+				field_idx++;
+				start = i + 1;
+			}
+			i++;
+		}
+	} else {
+		while (i < linelen) {
+			while (i < linelen && (line[i] == ' ' || line[i] == '\t'))
+				i++;
+			if (i == linelen)
+				break;
+			start = i;
+			while (i < linelen && line[i] != ' ' && line[i] != '\t')
+				i++;
+			if (field_idx == (size_t)k) {
+				*fstart = line + start;
+				*flen = i - start;
+				return;
+			}
+			field_idx++;
+		}
+	}
+
+	*fstart = "";
+	*flen = 0;
 }
 
 static inline size_t
@@ -423,9 +471,10 @@ static int
 process_stream(FILE *fp, const char *fname, int show_fname, const char *pat, size_t patlen, struct heap *h, size_t *count_out)
 {
 	char *line = NULL;
+	const char *match_tgt;
 	size_t linecap = 0;
 	ssize_t linelen;
-	size_t lineno = 0, len, matched_count = 0;
+	size_t lineno = 0, len, match_len, matched_count = 0;
 	double score;
 	int matched = 0, is_match;
 
@@ -437,10 +486,16 @@ process_stream(FILE *fp, const char *fname, int show_fname, const char *pat, siz
 		while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
 			line[--len] = '\0';
 
+		match_tgt = line;
+		match_len = len;
+
+		if (opt_field > 0)
+			extract_field(line, len, opt_delim, opt_field, &match_tgt, &match_len);
+
 		if (opt_exact)
-			score = sim_exact(pat, patlen, line, len, opt_icase);
+			score = sim_exact(pat, patlen, match_tgt, match_len, opt_icase);
 		else
-			score = sim_substr(pat, patlen, line, len, opt_icase);
+			score = sim_substr(pat, patlen, match_tgt, match_len, opt_icase);
 
 		is_match = opt_invert ? (score < threshold) : (score >= threshold);
 
@@ -481,6 +536,18 @@ main(int argc, char *argv[])
 	int matched = 0, err = 0, show_fname;
 
 	ARGBEGIN {
+	case 'd':
+		s = EARGF(usage());
+		if (strlen(s) != 1)
+			die("approx: delimiter must be a single character: %s", s);
+		opt_delim = s[0];
+		break;
+	case 'k':
+		s = EARGF(usage());
+		opt_field = strtol(s, &end, 10);
+		if (*end != '\0' || opt_field <= 0)
+			die("approx: invalid field: %s", s);
+		break;
 	case 'c':
 		opt_count = 1;
 		break;
