@@ -1,5 +1,5 @@
 /*
- * approx.h - v1.1.0 - Non-interactive fuzzy string matching and ranking library
+ * approx.h - v1.2.0 - Non-interactive fuzzy string matching and ranking library
  *
  * SPDX-License-Identifier: MIT
  * Copyright (c) 2026 Ricardo Veronese Ricci
@@ -24,7 +24,7 @@
 #include <stddef.h>
 
 #ifndef APPROX_VERSION
-#define APPROX_VERSION "1.1.0"
+#define APPROX_VERSION "1.2.0"
 #endif
 
 #ifndef APPROX_DEFAULT_THRESHOLD

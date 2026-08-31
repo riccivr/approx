@@ -1,3 +1,9 @@
+approx (1.2.0-1) unstable; urgency=medium
+
+  * Release 1.2.0: Single-header stb-style C and C++ library support (approx.h).
+
+ -- Ricardo Veronese Ricci <ricci.vr@gmail.com>  Tue, 01 Sep 2026 00:01:00 +0200
+
 approx (1.1.0-1) unstable; urgency=medium
 
   * New release 1.1.0 with pipeline flags, field targeting, transposition distance, and multi-pattern file search.

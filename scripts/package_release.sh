@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 DIST_DIR="/tmp/release-${VERSION}"
 
 rm -rf "$DIST_DIR"
