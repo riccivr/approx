@@ -87,12 +87,12 @@ printf "file2 beta\n" > "$tmp2"
 run_test "Interleaved stdin '-' between files" \
 	'printf "stdin gamma\n" | '"$APPROX"' "alpha" '"$tmp1"' - '"$tmp2"'' \
 	0 \
-	"file1 alpha"
+	"$tmp1:file1 alpha"
 
 run_test "Interleaved stdin '-' matching stdin line" \
 	'printf "stdin alpha\n" | '"$APPROX"' "alpha" '"$tmp1"' - '"$tmp2"'' \
 	0 \
-	"$(printf 'file1 alpha\nstdin alpha')"
+	"$(printf '%s:file1 alpha\n(standard input):stdin alpha' "$tmp1")"
 
 # Option argument validation & missing operands
 run_test "Missing option argument for -t at end of args" \

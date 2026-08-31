@@ -115,15 +115,15 @@ trap 'rm -f "$tmp1" "$tmp2"' EXIT INT TERM
 printf "alpha connection\n" > "$tmp1"
 printf "beta timeout\n" > "$tmp2"
 
-run_test "Multiple file arguments" \
+run_test "Multiple file arguments (auto-prefix headers)" \
 	''"$APPROX"' "connection" '"$tmp1"' '"$tmp2"'' \
 	0 \
-	"alpha connection"
+	"$tmp1:alpha connection"
 
 run_test "Combined stdin and file arguments" \
 	'printf "gamma connection\n" | '"$APPROX"' "connection" '"$tmp1"' -' \
 	0 \
-	"$(printf 'alpha connection\ngamma connection')"
+	"$(printf '%s:alpha connection\n(standard input):gamma connection' "$tmp1")"
 
 # Test 11: Error handling on invalid arguments (exit code 2)
 run_test "Non-existent file argument returns exit code 2" \
@@ -257,8 +257,8 @@ run_test "Damerau-Levenshtein succeeds on transposition with -D" \
 	"recieve"
 
 # Test 24: Multi-pattern file search (-F)
-printf "database\ntimeout\n" > "$tmp_pat"
-run_test "Multi-pattern search from file (-F)" \
+printf "\n\ndatabase\n\ntimeout\n\n" > "$tmp_pat"
+run_test "Multi-pattern search from file (-F) skipping blank lines" \
 	'printf "server started\ndatabase error\nnetwork timeout\nother\n" | '"$APPROX"' -F '"$tmp_pat"'' \
 	0 \
 	"$(printf 'database error\nnetwork timeout')"
@@ -268,6 +268,24 @@ run_test "ANSI match highlighting (-C)" \
 	'printf "quick brown fox\n" | '"$APPROX"' -C "brown"' \
 	0 \
 	"$(printf 'quick \033[1;31mbrown\033[0m fox')"
+
+# Test 26: Empty pattern handling
+run_test "Empty search pattern returns exit code 2" \
+	''"$APPROX"' ""' \
+	2 \
+	""
+
+# Test 27: Usage string contains -e
+run_test "Usage output contains -e flag" \
+	''"$APPROX"' 2>&1 | grep -q -- "-cCDehHilLmqsvV" && echo "ok"' \
+	0 \
+	"ok"
+
+# Test 28: Single file input defaults to no filename prefix
+run_test "Single file input does not prefix filename by default" \
+	''"$APPROX"' "connection" '"$tmp1"'' \
+	0 \
+	"alpha connection"
 
 printf "========================================\n"
 printf "Tests passed: %d, Failed: %d\n" "$PASSED" "$FAILED"

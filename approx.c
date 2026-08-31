@@ -119,7 +119,7 @@ die(const char *fmt, ...)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-cCDhHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] [-F file] [pattern] [file ...]\n", argv0);
+	fprintf(stderr, "usage: %s [-cCDehHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] [-F file] [pattern] [file ...]\n", argv0);
 	exit(2);
 }
 
@@ -131,13 +131,19 @@ pattern_list_add(struct pattern_list *pl, const char *pat, size_t len)
 	size_t *new_lens;
 	size_t new_cap;
 
+	if (len == 0)
+		return;
+
 	if (pl->count >= pl->cap) {
 		new_cap = pl->cap ? pl->cap * 2 : 8;
 		new_pats = (char **)realloc(pl->patterns, new_cap * sizeof(char *));
-		new_lens = (size_t *)realloc(pl->patlens, new_cap * sizeof(size_t));
-		if (!new_pats || !new_lens)
+		if (!new_pats)
 			die("approx: out of memory");
 		pl->patterns = new_pats;
+
+		new_lens = (size_t *)realloc(pl->patlens, new_cap * sizeof(size_t));
+		if (!new_lens)
+			die("approx: out of memory");
 		pl->patlens = new_lens;
 		pl->cap = new_cap;
 	}
@@ -189,6 +195,8 @@ load_pattern_file(struct pattern_list *pl, const char *path)
 		len = (size_t)linelen;
 		while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
 			line[--len] = '\0';
+		if (len == 0)
+			continue;
 		pattern_list_add(pl, line, len);
 	}
 
@@ -196,14 +204,12 @@ load_pattern_file(struct pattern_list *pl, const char *path)
 	fclose(fp);
 
 	if (pl->count == 0)
-		die("approx: %s: pattern file is empty", path);
+		die("approx: %s: pattern file contains no non-empty patterns", path);
 }
 
 static void
-print_match(const char *fname, int show_fname, double score, const char *line, size_t mstart, size_t mend, int has_span)
+print_match(const char *fname, int show_fname, double score, const char *line, size_t len, size_t mstart, size_t mend, int has_span)
 {
-	size_t len = strlen(line);
-
 	if (show_fname && fname)
 		printf("%s:", fname);
 
@@ -211,17 +217,20 @@ print_match(const char *fname, int show_fname, double score, const char *line, s
 		printf("%.2f\t", score);
 
 	if (opt_color && has_span && len > 0 && mend >= mstart && mend < len) {
-		printf("%.*s\033[1;31m%.*s\033[0m%s\n",
-		       (int)mstart, line,
-		       (int)(mend + 1 - mstart), line + mstart,
-		       line + mend + 1);
+		fwrite(line, 1, mstart, stdout);
+		fputs("\033[1;31m", stdout);
+		fwrite(line + mstart, 1, mend + 1 - mstart, stdout);
+		fputs("\033[0m", stdout);
+		fwrite(line + mend + 1, 1, len - (mend + 1), stdout);
+		fputc('\n', stdout);
 	} else {
-		puts(line);
+		fwrite(line, 1, len, stdout);
+		fputc('\n', stdout);
 	}
 }
 
 static int
-process_stream(FILE *fp, const char *fname, int show_fname, const struct pattern_list *pl, approx_heap_t *h, size_t *count_out)
+process_stream(FILE *fp, const char *display_name, int show_fname, const struct pattern_list *pl, approx_heap_t *h, size_t *count_out)
 {
 	char *line = NULL;
 	const char *match_tgt;
@@ -273,14 +282,14 @@ process_stream(FILE *fp, const char *fname, int show_fname, const struct pattern
 			if (opt_quiet)
 				break;
 			if (opt_files_with_matches) {
-				puts(fname ? fname : "(standard input)");
+				puts(display_name);
 				break;
 			}
 			if (!opt_count && !opt_files_without_matches) {
 				if (h) {
-					approx_heap_push(h, score, line, show_fname ? fname : NULL, best_mstart, best_mend, !opt_invert, lineno);
+					approx_heap_push(h, score, line, len, show_fname ? display_name : NULL, best_mstart, best_mend, !opt_invert, lineno);
 				} else {
-					print_match(fname, show_fname, score, line, best_mstart, best_mend, !opt_invert);
+					print_match(display_name, show_fname, score, line, len, best_mstart, best_mend, !opt_invert);
 				}
 			}
 			if (opt_max > 0 && matched_count >= (size_t)opt_max)
@@ -386,12 +395,19 @@ main(int argc, char *argv[])
 	} else {
 		if (argc < 1)
 			usage();
+		if (strlen(argv[0]) == 0)
+			die("approx: search pattern cannot be empty");
 		pattern_list_add(&pl, argv[0], strlen(argv[0]));
 		argc--;
 		argv++;
 	}
 
-	show_fname = (opt_header == 1);
+	if (opt_header == 1)
+		show_fname = 1;
+	else if (opt_header == 0)
+		show_fname = 0;
+	else
+		show_fname = (argc > 1);
 
 	if (opt_topn > 0 && !opt_quiet && !opt_count && !opt_files_with_matches && !opt_files_without_matches) {
 		h = approx_heap_create((size_t)opt_topn);
@@ -400,23 +416,24 @@ main(int argc, char *argv[])
 	}
 
 	if (argc == 0) {
-		const char *fname = (show_fname) ? "(standard input)" : NULL;
-		if (process_stream(stdin, fname, show_fname, &pl, h, &cur_count))
+		const char *display_name = "(standard input)";
+		if (process_stream(stdin, display_name, show_fname, &pl, h, &cur_count))
 			matched = 1;
 		if (opt_files_without_matches && cur_count == 0 && !opt_quiet)
-			puts("(standard input)");
+			puts(display_name);
 		if (opt_count && !opt_quiet && !opt_files_with_matches && !opt_files_without_matches) {
-			if (show_fname && fname)
-				printf("%s:%lu\n", fname, (unsigned long)cur_count);
+			if (show_fname)
+				printf("%s:%lu\n", display_name, (unsigned long)cur_count);
 			else
 				printf("%lu\n", (unsigned long)cur_count);
 		}
 	} else {
 		for (i = 0; i < (size_t)argc; i++) {
-			const char *fname = argv[i];
-			if (strcmp(fname, "-") == 0) {
+			int is_stdin = (strcmp(argv[i], "-") == 0);
+			const char *display_name = is_stdin ? "(standard input)" : argv[i];
+
+			if (is_stdin) {
 				fp = stdin;
-				fname = (show_fname) ? "(standard input)" : NULL;
 			} else {
 				fp = fopen(argv[i], "r");
 				if (!fp) {
@@ -426,15 +443,15 @@ main(int argc, char *argv[])
 				}
 			}
 
-			if (process_stream(fp, argv[i], show_fname, &pl, h, &cur_count))
+			if (process_stream(fp, display_name, show_fname, &pl, h, &cur_count))
 				matched = 1;
 
 			if (opt_files_without_matches && cur_count == 0 && !opt_quiet)
-				puts(argv[i]);
+				puts(display_name);
 
 			if (opt_count && !opt_quiet && !opt_files_with_matches && !opt_files_without_matches) {
 				if (show_fname)
-					printf("%s:%lu\n", argv[i], (unsigned long)cur_count);
+					printf("%s:%lu\n", display_name, (unsigned long)cur_count);
 				else
 					total_count += cur_count;
 			}
@@ -452,7 +469,7 @@ main(int argc, char *argv[])
 	if (h) {
 		approx_heap_sort(h);
 		for (i = 0; i < h->size; i++)
-			print_match(h->items[i].meta, h->items[i].meta != NULL, h->items[i].score, h->items[i].line, h->items[i].mstart, h->items[i].mend, h->items[i].has_span);
+			print_match(h->items[i].meta, h->items[i].meta != NULL, h->items[i].score, h->items[i].line, h->items[i].linelen, h->items[i].mstart, h->items[i].mend, h->items[i].has_span);
 		approx_heap_free(h);
 	}
 

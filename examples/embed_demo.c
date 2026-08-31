@@ -40,7 +40,7 @@ int main(void)
     approx_heap_t *heap = approx_heap_create(2);
     for (i = 0; i < num_logs; i++) {
         double score = approx_sim(pattern, strlen(pattern), logs[i], strlen(logs[i]), APPROX_ICASE);
-        approx_heap_push(heap, score, logs[i], NULL, 0, 0, 0, i);
+        approx_heap_push(heap, score, logs[i], strlen(logs[i]), NULL, 0, 0, 0, i);
     }
 
     approx_heap_sort(heap);

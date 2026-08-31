@@ -50,6 +50,7 @@ extern "C" {
 typedef struct approx_match {
 	double score;
 	char *line;
+	size_t linelen;
 	char *meta;
 	size_t mstart;
 	size_t mend;
@@ -78,8 +79,8 @@ APPROXDEF void approx_extract_field(const char *str, size_t strlen_val, char del
 /* Top-N Bounded Min-Heap for ranking */
 APPROXDEF approx_heap_t *approx_heap_create(size_t cap);
 APPROXDEF void approx_heap_free(approx_heap_t *h);
-APPROXDEF int approx_heap_push(approx_heap_t *h, double score, const char *line, const char *meta,
-                               size_t mstart, size_t mend, int has_span, size_t id);
+APPROXDEF int approx_heap_push(approx_heap_t *h, double score, const char *line, size_t linelen,
+                               const char *meta, size_t mstart, size_t mend, int has_span, size_t id);
 APPROXDEF void approx_heap_sort(approx_heap_t *h);
 
 #ifdef __cplusplus
@@ -209,7 +210,7 @@ approx_sim_span(const char *pat, size_t patlen, const char *str, size_t strlen_v
 		if (patlen == 0) {
 			if (mstart) *mstart = 0;
 			if (mend) *mend = 0;
-			return 1.0;
+			return (strlen_val == 0) ? 1.0 : 0.0;
 		}
 		if (strlen_val == 0) {
 			if (mstart) *mstart = 0;
@@ -420,27 +421,32 @@ approx__sift_down(approx_heap_t *h, size_t idx)
 }
 
 APPROXDEF int
-approx_heap_push(approx_heap_t *h, double score, const char *line, const char *meta,
-                 size_t mstart, size_t mend, int has_span, size_t id)
+approx_heap_push(approx_heap_t *h, double score, const char *line, size_t linelen,
+                 const char *meta, size_t mstart, size_t mend, int has_span, size_t id)
 {
 	char *dup_line, *dup_meta = NULL;
 
 	if (!h || h->cap == 0)
 		return 0;
 
-	if (h->size < h->cap) {
-		dup_line = approx__strdup(line);
-		if (!dup_line)
+	dup_line = (char *)APPROX_MALLOC(linelen + 1);
+	if (!dup_line)
+		return 0;
+	memcpy(dup_line, line, linelen);
+	dup_line[linelen] = '\0';
+
+	if (meta) {
+		dup_meta = approx__strdup(meta);
+		if (!dup_meta) {
+			APPROX_FREE(dup_line);
 			return 0;
-		if (meta) {
-			dup_meta = approx__strdup(meta);
-			if (!dup_meta) {
-				APPROX_FREE(dup_line);
-				return 0;
-			}
 		}
+	}
+
+	if (h->size < h->cap) {
 		h->items[h->size].score = score;
 		h->items[h->size].line = dup_line;
+		h->items[h->size].linelen = linelen;
 		h->items[h->size].meta = dup_meta;
 		h->items[h->size].mstart = mstart;
 		h->items[h->size].mend = mend;
@@ -450,20 +456,11 @@ approx_heap_push(approx_heap_t *h, double score, const char *line, const char *m
 		approx__sift_up(h, h->size - 1);
 		return 1;
 	} else if (score > h->items[0].score) {
-		dup_line = approx__strdup(line);
-		if (!dup_line)
-			return 0;
-		if (meta) {
-			dup_meta = approx__strdup(meta);
-			if (!dup_meta) {
-				APPROX_FREE(dup_line);
-				return 0;
-			}
-		}
 		APPROX_FREE(h->items[0].line);
 		APPROX_FREE(h->items[0].meta);
 		h->items[0].score = score;
 		h->items[0].line = dup_line;
+		h->items[0].linelen = linelen;
 		h->items[0].meta = dup_meta;
 		h->items[0].mstart = mstart;
 		h->items[0].mend = mend;
@@ -473,6 +470,8 @@ approx_heap_push(approx_heap_t *h, double score, const char *line, const char *m
 		return 1;
 	}
 
+	APPROX_FREE(dup_line);
+	APPROX_FREE(dup_meta);
 	return 0;
 }
 

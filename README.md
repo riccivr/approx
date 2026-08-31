@@ -1,32 +1,48 @@
 approx
 ======
-approx filters and ranks text streams using fuzzy string matching. It reads
-from standard input or files, scores lines against a pattern, and writes
-matches to standard output.
+approx is a non-interactive, typo-tolerant stream filter and ranker. It reads
+from standard input or files, scores lines against a search pattern using
+semi-global Levenshtein or Damerau-Levenshtein distance, and writes matching
+lines to standard output.
 
-It runs non-interactively in standard shell pipelines without external
-dependencies, and can also be embedded directly as an `stb`-style single-header
-C/C++ library (`approx.h`).
+It runs in standard shell pipelines without external dependencies, and can
+also be embedded directly into C and C++ projects as an `stb`-style
+single-header library (`approx.h`).
 
 [![Demo](assets/demo.gif)](https://asciinema.org/a/tVerOgwr5zF6CJGM)
+
+How it Works
+------------
+Unlike interactive subsequence fuzzy-finders (such as `fzf`), `approx` is designed
+for shell pipelines and log analysis where typos in words or phrases need to be
+tolerated.
+
+By default, `approx` performs semi-global ("fuzzy contains") matching: prefixes
+and suffixes in the line are free, and edit penalties are paid only to align the
+query pattern against the closest matching substring:
+
+$$\text{similarity} = 1 - \frac{\text{edit\_distance}}{|\text{pattern}|}$$
+
+* Matching is byte-oriented; case-insensitivity (`-i`) performs ASCII case-folding.
+* Memory usage scales with pattern length ($O(M)$), streaming arbitrarily long lines.
 
 Features
 --------
 * Strict C99 and standard POSIX libc headers only.
-* Single-header library (`approx.h`): drop into any C or C++ project without build dependencies.
+* Single-header library (`approx.h`): drop into any C or C++ project without build systems.
 * Low memory use: dynamic programming table uses memory proportional to pattern length, not line length.
 * Streams line by line without loading the input into memory.
 * Bounded min-heap for top-N ranking.
-* POSIX argument parsing and exit codes.
-* Target specific columns with custom field delimiters.
-* Damerau-Levenshtein transposition support.
-* Multi-pattern search from files.
-* ANSI color match highlighting.
+* Automatic filename prefixing on multiple files (grep-compatible `-H` / `-h` control).
+* Target specific columns with custom field delimiters (`-k` and `-d`).
+* Damerau-Levenshtein adjacent transposition support (`-D`).
+* Multi-pattern search from files (`-F`).
+* ANSI color match highlighting (`-C`).
 * Works on Linux, macOS, BSD, and Windows.
 
 C / C++ Library (`approx.h`)
 ----------------------------
-`approx.h` is an `stb`-style single-header library. To use it, drop `approx.h` into your project.
+`approx.h` is an `stb`-style single-header library. Drop `approx.h` into your project.
 
 In **exactly one** `.c` or `.cpp` file:
 ```c
@@ -65,7 +81,7 @@ Installation
 
 ### Build from source (recommended)
 
-Requirements: a C99 compiler (gcc, clang, or tcc) and make.
+Requirements: a C99 compiler (`gcc`, `clang`, or `tcc`) and `make`.
 
 ```sh
 git clone https://github.com/riccivr/approx.git
@@ -80,39 +96,18 @@ To install into another directory such as `~/.local`:
 make PREFIX="$HOME/.local" install
 ```
 
-### Package managers
-
-#### macOS and Linux (Homebrew)
-```sh
-brew install riccivr/tap/approx
-```
-
-#### Arch Linux (AUR)
-```sh
-yay -S approx
-```
-
-#### Debian and Ubuntu (.deb)
-```sh
-cd packaging/debian
-dpkg-buildpackage -us -uc -b
-sudo dpkg -i ../approx_*.deb
-```
-
-#### Windows (Scoop or Chocolatey)
-```powershell
-# Scoop
-scoop bucket add approx https://github.com/riccivr/approx
-scoop install approx
-
-# Chocolatey
-choco install approx
-```
-
 ### Pre-compiled binaries
-Static binaries for Linux, macOS, and Windows are attached to each release:
+Static binaries for Linux and Windows are attached to each release:
 
 Download from [GitHub Releases](https://github.com/riccivr/approx/releases)
+
+### Packaging recipes
+Package definitions for distribution maintainers and local package builds are provided under `packaging/`:
+* `packaging/debian/`: Debian / Ubuntu packaging (`dpkg-buildpackage`)
+* `packaging/aur/`: Arch Linux `PKGBUILD`
+* `packaging/homebrew/`: Homebrew formula (`approx.rb`)
+* `packaging/scoop/`: Scoop manifest (`approx.json`)
+* `packaging/chocolatey/`: Chocolatey package (`approx.nuspec`)
 
 Running tests
 -------------
@@ -135,7 +130,7 @@ metric invariants, C/C++ embedding, sanitizers, and throughput:
 Usage
 -----
 ```
-approx [-cCDhHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] [-F file] [pattern] [file ...]
+approx [-cCDehHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] [-F file] [pattern] [file ...]
 ```
 
 ### Options
