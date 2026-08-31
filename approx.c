@@ -77,6 +77,9 @@ static int opt_invert = 0;
 static int opt_exact = 0;
 static int opt_quiet = 0;
 static int opt_count = 0;
+static int opt_files_with_matches = 0;
+static int opt_files_without_matches = 0;
+static int opt_header = -1;
 static long opt_topn = 0;
 static long opt_max = 0;
 
@@ -102,7 +105,7 @@ die(const char *fmt, ...)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-ceimqsvV] [-t threshold] [-n count] [-m max] pattern [file ...]\n", argv0);
+	fprintf(stderr, "usage: %s [-cehHilLmqsvV] [-t threshold] [-n count] [-m max] pattern [file ...]\n", argv0);
 	exit(2);
 }
 
@@ -285,8 +288,10 @@ heap_free(struct heap *h)
 	if (!h)
 		return;
 
-	for (i = 0; i < h->size; i++)
+	for (i = 0; i < h->size; i++) {
 		free(h->items[i].line);
+		free(h->items[i].fname);
+	}
 
 	free(h->items);
 	free(h);
@@ -335,26 +340,43 @@ sift_down(struct heap *h, size_t idx)
 }
 
 void
-heap_push(struct heap *h, double score, const char *line, size_t lineno)
+heap_push(struct heap *h, double score, const char *line, const char *fname, size_t lineno)
 {
-	char *dup;
+	char *dup_line, *dup_fname = NULL;
 
 	if (h->size < h->cap) {
-		dup = strdup(line);
-		if (!dup)
+		dup_line = strdup(line);
+		if (!dup_line)
 			die("approx: out of memory");
+		if (fname) {
+			dup_fname = strdup(fname);
+			if (!dup_fname) {
+				free(dup_line);
+				die("approx: out of memory");
+			}
+		}
 		h->items[h->size].score = score;
-		h->items[h->size].line = dup;
+		h->items[h->size].line = dup_line;
+		h->items[h->size].fname = dup_fname;
 		h->items[h->size].lineno = lineno;
 		h->size++;
 		sift_up(h, h->size - 1);
 	} else if (score > h->items[0].score) {
-		dup = strdup(line);
-		if (!dup)
+		dup_line = strdup(line);
+		if (!dup_line)
 			die("approx: out of memory");
+		if (fname) {
+			dup_fname = strdup(fname);
+			if (!dup_fname) {
+				free(dup_line);
+				die("approx: out of memory");
+			}
+		}
 		free(h->items[0].line);
+		free(h->items[0].fname);
 		h->items[0].score = score;
-		h->items[0].line = dup;
+		h->items[0].line = dup_line;
+		h->items[0].fname = dup_fname;
 		h->items[0].lineno = lineno;
 		sift_down(h, 0);
 	}
@@ -381,8 +403,24 @@ heap_sort_descending(struct heap *h)
 	qsort(h->items, h->size, sizeof(h->items[0]), cmp_items_desc);
 }
 
+static void
+print_match(const char *fname, int show_fname, double score, const char *line)
+{
+	if (show_fname && fname) {
+		if (opt_score)
+			printf("%s:%.2f\t%s\n", fname, score, line);
+		else
+			printf("%s:%s\n", fname, line);
+	} else {
+		if (opt_score)
+			printf("%.2f\t%s\n", score, line);
+		else
+			puts(line);
+	}
+}
+
 static int
-process_stream(FILE *fp, const char *pat, size_t patlen, struct heap *h, size_t *count_out)
+process_stream(FILE *fp, const char *fname, int show_fname, const char *pat, size_t patlen, struct heap *h, size_t *count_out)
 {
 	char *line = NULL;
 	size_t linecap = 0;
@@ -411,13 +449,15 @@ process_stream(FILE *fp, const char *pat, size_t patlen, struct heap *h, size_t 
 			matched_count++;
 			if (opt_quiet)
 				break;
-			if (!opt_count) {
+			if (opt_files_with_matches) {
+				puts(fname ? fname : "(standard input)");
+				break;
+			}
+			if (!opt_count && !opt_files_without_matches) {
 				if (h) {
-					heap_push(h, score, line, lineno);
-				} else if (opt_score) {
-					printf("%.2f\t%s\n", score, line);
+					heap_push(h, score, line, show_fname ? fname : NULL, lineno);
 				} else {
-					puts(line);
+					print_match(fname, show_fname, score, line);
 				}
 			}
 			if (opt_max > 0 && matched_count >= (size_t)opt_max)
@@ -438,7 +478,7 @@ main(int argc, char *argv[])
 	char *pat, *s, *end;
 	size_t patlen, i, cur_count, total_count = 0;
 	struct heap *h = NULL;
-	int matched = 0, err = 0;
+	int matched = 0, err = 0, show_fname;
 
 	ARGBEGIN {
 	case 'c':
@@ -446,6 +486,18 @@ main(int argc, char *argv[])
 		break;
 	case 'q':
 		opt_quiet = 1;
+		break;
+	case 'l':
+		opt_files_with_matches = 1;
+		break;
+	case 'L':
+		opt_files_without_matches = 1;
+		break;
+	case 'H':
+		opt_header = 1;
+		break;
+	case 'h':
+		opt_header = 0;
 		break;
 	case 'm':
 		s = EARGF(usage());
@@ -492,17 +544,29 @@ main(int argc, char *argv[])
 	argc--;
 	argv++;
 
-	if (opt_topn > 0 && !opt_quiet && !opt_count)
+	show_fname = (opt_header == 1);
+
+	if (opt_topn > 0 && !opt_quiet && !opt_count && !opt_files_with_matches && !opt_files_without_matches)
 		h = heap_create((size_t)opt_topn);
 
 	if (argc == 0) {
-		if (process_stream(stdin, pat, patlen, h, &cur_count))
+		const char *fname = (show_fname) ? "(standard input)" : NULL;
+		if (process_stream(stdin, fname, show_fname, pat, patlen, h, &cur_count))
 			matched = 1;
-		total_count += cur_count;
+		if (opt_files_without_matches && cur_count == 0 && !opt_quiet)
+			puts("(standard input)");
+		if (opt_count && !opt_quiet && !opt_files_with_matches && !opt_files_without_matches) {
+			if (show_fname && fname)
+				printf("%s:%zu\n", fname, cur_count);
+			else
+				printf("%zu\n", cur_count);
+		}
 	} else {
 		for (i = 0; i < (size_t)argc; i++) {
-			if (strcmp(argv[i], "-") == 0) {
+			const char *fname = argv[i];
+			if (strcmp(fname, "-") == 0) {
 				fp = stdin;
+				fname = (show_fname) ? "(standard input)" : NULL;
 			} else {
 				fp = fopen(argv[i], "r");
 				if (!fp) {
@@ -512,9 +576,18 @@ main(int argc, char *argv[])
 				}
 			}
 
-			if (process_stream(fp, pat, patlen, h, &cur_count))
+			if (process_stream(fp, argv[i], show_fname, pat, patlen, h, &cur_count))
 				matched = 1;
-			total_count += cur_count;
+
+			if (opt_files_without_matches && cur_count == 0 && !opt_quiet)
+				puts(argv[i]);
+
+			if (opt_count && !opt_quiet && !opt_files_with_matches && !opt_files_without_matches) {
+				if (show_fname)
+					printf("%s:%zu\n", argv[i], cur_count);
+				else
+					total_count += cur_count;
+			}
 
 			if (fp != stdin)
 				fclose(fp);
@@ -522,21 +595,16 @@ main(int argc, char *argv[])
 			if (opt_quiet && matched)
 				break;
 		}
+		if (opt_count && !show_fname && !opt_quiet && !opt_files_with_matches && !opt_files_without_matches)
+			printf("%zu\n", total_count);
 	}
 
 	if (h) {
 		heap_sort_descending(h);
-		for (i = 0; i < h->size; i++) {
-			if (opt_score)
-				printf("%.2f\t%s\n", h->items[i].score, h->items[i].line);
-			else
-				puts(h->items[i].line);
-		}
+		for (i = 0; i < h->size; i++)
+			print_match(h->items[i].fname, h->items[i].fname != NULL, h->items[i].score, h->items[i].line);
 		heap_free(h);
 	}
-
-	if (opt_count && !opt_quiet)
-		printf("%zu\n", total_count);
 
 	if (fflush(stdout) == EOF || ferror(stdout)) {
 		if (errno != EPIPE)

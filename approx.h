@@ -16,6 +16,7 @@
 struct match_item {
 	double score;
 	char *line;
+	char *fname;
 	size_t lineno;
 };
 
@@ -32,7 +33,7 @@ double sim_exact(const char *pat, size_t patlen, const char *line, size_t linele
 /* top-n heap */
 struct heap *heap_create(size_t cap);
 void heap_free(struct heap *h);
-void heap_push(struct heap *h, double score, const char *line, size_t lineno);
+void heap_push(struct heap *h, double score, const char *line, const char *fname, size_t lineno);
 void heap_sort_descending(struct heap *h);
 
 #endif
