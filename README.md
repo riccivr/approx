@@ -128,26 +128,55 @@ Examples
 --------
 Filter log lines for typos in "connection timeout":
 
-    cat server.log | approx "connection timeout"
+```sh
+$ cat server.log | approx "connection timeout"
+2026-08-31 20:11:02 [ERROR] connectoin timeout to db-primary
+2026-08-31 20:14:55 [ERROR] connection timed out after 30s
+```
 
 Target column 2 of a CSV file for typoed user names:
 
-    approx -d, -k 2 "john_doe" users.csv
+```sh
+$ approx -d, -k 2 "john_doe" users.csv
+101,jhn_doe,engineer,active
+109,john_doe_99,manager,active
+```
 
 Tolerate swapped letters with Damerau-Levenshtein:
 
-    approx -D -t 0.85 "receive" /usr/share/dict/words
+```sh
+$ approx -D -t 0.85 "receive" /usr/share/dict/words
+receive
+recieve
+```
 
-Quiet check in shell conditionals:
+Find the top 5 closest matches with similarity scores:
 
-    if approx -q "FATAL" /var/log/syslog; then
-        notify-send "Server error detected"
-    fi
-
-Find the top 5 closest matches from a wordlist:
-
-    approx -n 5 -s "recieve" /usr/share/dict/words
+```sh
+$ approx -n 5 -s "recieve" /usr/share/dict/words
+1.00	recieve
+0.86	receive
+0.86	relieve
+0.71	recede
+0.71	recipe
+```
 
 Search against multiple patterns from a file:
 
-    approx -F patterns.txt server.log
+```sh
+$ cat patterns.txt
+database error
+connection timeout
+
+$ approx -F patterns.txt server.log
+2026-08-31 19:40:11 [WARN] databse error: pool exhausted
+2026-08-31 20:11:02 [ERROR] connectoin timeout to db-primary
+```
+
+Quiet check in shell conditionals:
+
+```sh
+if approx -q "FATAL" /var/log/syslog; then
+    notify-send "Server error detected"
+fi
+```
