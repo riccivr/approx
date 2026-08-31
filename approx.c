@@ -78,6 +78,7 @@ static int opt_exact = 0;
 static int opt_damerau = 0;
 static int opt_quiet = 0;
 static int opt_count = 0;
+static int opt_color = 0;
 static int opt_files_with_matches = 0;
 static int opt_files_without_matches = 0;
 static int opt_header = -1;
@@ -116,7 +117,7 @@ die(const char *fmt, ...)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-cDehHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] [-F file] [pattern] [file ...]\n", argv0);
+	fprintf(stderr, "usage: %s [-cCDhHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] [-F file] [pattern] [file ...]\n", argv0);
 	exit(2);
 }
 
@@ -258,19 +259,33 @@ char_eq(char a, char b, int icase)
 }
 
 double
-sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int icase, int damerau)
+sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int icase, int damerau, size_t *mstart, size_t *mend)
 {
 	size_t buf_a[256], buf_b[256], buf_c[256];
+	size_t s_buf_a[256], s_buf_b[256], s_buf_c[256];
 	size_t *pprev, *prev, *curr, *tmp;
+	size_t *s_pprev, *s_prev, *s_curr, *s_tmp;
 	size_t *alloc_a = NULL, *alloc_b = NULL, *alloc_c = NULL;
+	size_t *s_alloc_a = NULL, *s_alloc_b = NULL, *s_alloc_c = NULL;
 	size_t min_dist, cost;
-	size_t i, j;
+	size_t best_start = 0, best_end = 0;
+	size_t i, j, from_start;
 	char c;
 
-	if (patlen == 0)
+	if (patlen == 0) {
+		if (mstart)
+			*mstart = 0;
+		if (mend)
+			*mend = 0;
 		return 1.0;
-	if (linelen == 0)
+	}
+	if (linelen == 0) {
+		if (mstart)
+			*mstart = 0;
+		if (mend)
+			*mend = 0;
 		return 0.0;
+	}
 
 	if (patlen > SIZE_MAX / sizeof(size_t) - 1)
 		die("approx: pattern too long");
@@ -279,24 +294,34 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 		pprev = buf_a;
 		prev = buf_b;
 		curr = buf_c;
+		s_pprev = s_buf_a;
+		s_prev = s_buf_b;
+		s_curr = s_buf_c;
 	} else {
 		alloc_a = malloc((patlen + 1) * sizeof(size_t));
 		alloc_b = malloc((patlen + 1) * sizeof(size_t));
 		alloc_c = malloc((patlen + 1) * sizeof(size_t));
-		if (!alloc_a || !alloc_b || !alloc_c) {
-			free(alloc_a);
-			free(alloc_b);
-			free(alloc_c);
+		s_alloc_a = malloc((patlen + 1) * sizeof(size_t));
+		s_alloc_b = malloc((patlen + 1) * sizeof(size_t));
+		s_alloc_c = malloc((patlen + 1) * sizeof(size_t));
+		if (!alloc_a || !alloc_b || !alloc_c || !s_alloc_a || !s_alloc_b || !s_alloc_c) {
+			free(alloc_a); free(alloc_b); free(alloc_c);
+			free(s_alloc_a); free(s_alloc_b); free(s_alloc_c);
 			die("approx: out of memory");
 		}
 		pprev = alloc_a;
 		prev = alloc_b;
 		curr = alloc_c;
+		s_pprev = s_alloc_a;
+		s_prev = s_alloc_b;
+		s_curr = s_alloc_c;
 	}
 
 	for (i = 0; i <= patlen; i++) {
 		prev[i] = i;
 		pprev[i] = i;
+		s_prev[i] = 0;
+		s_pprev[i] = 0;
 	}
 
 	min_dist = patlen;
@@ -304,34 +329,62 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 	for (j = 0; j < linelen; j++) {
 		c = line[j];
 		curr[0] = 0;
+		s_curr[0] = j;
 
 		for (i = 1; i <= patlen; i++) {
 			cost = char_eq(pat[i - 1], c, icase) ? 0 : 1;
-			curr[i] = min3(curr[i - 1] + 1,
-			               prev[i] + 1,
-			               prev[i - 1] + cost);
+
+			curr[i] = prev[i - 1] + cost;
+			from_start = s_prev[i - 1];
+
+			if (curr[i - 1] + 1 < curr[i]) {
+				curr[i] = curr[i - 1] + 1;
+				from_start = s_curr[i - 1];
+			}
+
+			if (prev[i] + 1 < curr[i]) {
+				curr[i] = prev[i] + 1;
+				from_start = s_prev[i];
+			}
+
 			if (damerau && j > 0 && i > 1 &&
 			    char_eq(pat[i - 1], line[j - 1], icase) &&
 			    char_eq(pat[i - 2], c, icase)) {
-				if (pprev[i - 2] + 1 < curr[i])
+				if (pprev[i - 2] + 1 < curr[i]) {
 					curr[i] = pprev[i - 2] + 1;
+					from_start = s_pprev[i - 2];
+				}
 			}
+
+			s_curr[i] = from_start;
 		}
 
-		if (curr[patlen] < min_dist)
+		if (curr[patlen] < min_dist) {
 			min_dist = curr[patlen];
+			best_start = s_curr[patlen];
+			best_end = j;
+		}
 
 		tmp = pprev;
 		pprev = prev;
 		prev = curr;
 		curr = tmp;
+
+		s_tmp = s_pprev;
+		s_pprev = s_prev;
+		s_prev = s_curr;
+		s_curr = s_tmp;
 	}
 
 	if (alloc_a) {
-		free(alloc_a);
-		free(alloc_b);
-		free(alloc_c);
+		free(alloc_a); free(alloc_b); free(alloc_c);
+		free(s_alloc_a); free(s_alloc_b); free(s_alloc_c);
 	}
+
+	if (mstart)
+		*mstart = best_start;
+	if (mend)
+		*mend = best_end;
 
 	if (min_dist >= patlen)
 		return 0.0;
@@ -501,7 +554,7 @@ sift_down(struct heap *h, size_t idx)
 }
 
 void
-heap_push(struct heap *h, double score, const char *line, const char *fname, size_t lineno)
+heap_push(struct heap *h, double score, const char *line, const char *fname, size_t mstart, size_t mend, int has_span, size_t lineno)
 {
 	char *dup_line, *dup_fname = NULL;
 
@@ -519,6 +572,9 @@ heap_push(struct heap *h, double score, const char *line, const char *fname, siz
 		h->items[h->size].score = score;
 		h->items[h->size].line = dup_line;
 		h->items[h->size].fname = dup_fname;
+		h->items[h->size].mstart = mstart;
+		h->items[h->size].mend = mend;
+		h->items[h->size].has_span = has_span;
 		h->items[h->size].lineno = lineno;
 		h->size++;
 		sift_up(h, h->size - 1);
@@ -538,6 +594,9 @@ heap_push(struct heap *h, double score, const char *line, const char *fname, siz
 		h->items[0].score = score;
 		h->items[0].line = dup_line;
 		h->items[0].fname = dup_fname;
+		h->items[0].mstart = mstart;
+		h->items[0].mend = mend;
+		h->items[0].has_span = has_span;
 		h->items[0].lineno = lineno;
 		sift_down(h, 0);
 	}
@@ -565,18 +624,23 @@ heap_sort_descending(struct heap *h)
 }
 
 static void
-print_match(const char *fname, int show_fname, double score, const char *line)
+print_match(const char *fname, int show_fname, double score, const char *line, size_t mstart, size_t mend, int has_span)
 {
-	if (show_fname && fname) {
-		if (opt_score)
-			printf("%s:%.2f\t%s\n", fname, score, line);
-		else
-			printf("%s:%s\n", fname, line);
+	size_t len = strlen(line);
+
+	if (show_fname && fname)
+		printf("%s:", fname);
+
+	if (opt_score)
+		printf("%.2f\t", score);
+
+	if (opt_color && has_span && len > 0 && mend >= mstart && mend < len) {
+		printf("%.*s\033[1;31m%.*s\033[0m%s\n",
+		       (int)mstart, line,
+		       (int)(mend + 1 - mstart), line + mstart,
+		       line + mend + 1);
 	} else {
-		if (opt_score)
-			printf("%.2f\t%s\n", score, line);
-		else
-			puts(line);
+		puts(line);
 	}
 }
 
@@ -588,6 +652,7 @@ process_stream(FILE *fp, const char *fname, int show_fname, const struct pattern
 	size_t linecap = 0;
 	ssize_t linelen;
 	size_t lineno = 0, len, match_len, matched_count = 0, p;
+	size_t mstart, mend, best_mstart, best_mend;
 	double score, cur_score;
 	int matched = 0, is_match;
 
@@ -606,13 +671,27 @@ process_stream(FILE *fp, const char *fname, int show_fname, const struct pattern
 			extract_field(line, len, opt_delim, opt_field, &match_tgt, &match_len);
 
 		score = -1.0;
+		best_mstart = 0;
+		best_mend = 0;
 		for (p = 0; p < pl->count; p++) {
-			if (opt_exact)
+			if (opt_exact) {
 				cur_score = sim_exact(pl->patterns[p], pl->patlens[p], match_tgt, match_len, opt_icase, opt_damerau);
-			else
-				cur_score = sim_substr(pl->patterns[p], pl->patlens[p], match_tgt, match_len, opt_icase, opt_damerau);
-			if (cur_score > score)
+				mstart = 0;
+				mend = match_len > 0 ? match_len - 1 : 0;
+			} else {
+				cur_score = sim_substr(pl->patterns[p], pl->patlens[p], match_tgt, match_len, opt_icase, opt_damerau, &mstart, &mend);
+			}
+			if (cur_score > score) {
 				score = cur_score;
+				best_mstart = mstart;
+				best_mend = mend;
+			}
+		}
+
+		if (opt_field > 0 && match_tgt >= line) {
+			size_t offset = (size_t)(match_tgt - line);
+			best_mstart += offset;
+			best_mend += offset;
 		}
 
 		is_match = opt_invert ? (score < threshold) : (score >= threshold);
@@ -628,9 +707,9 @@ process_stream(FILE *fp, const char *fname, int show_fname, const struct pattern
 			}
 			if (!opt_count && !opt_files_without_matches) {
 				if (h) {
-					heap_push(h, score, line, show_fname ? fname : NULL, lineno);
+					heap_push(h, score, line, show_fname ? fname : NULL, best_mstart, best_mend, !opt_invert, lineno);
 				} else {
-					print_match(fname, show_fname, score, line);
+					print_match(fname, show_fname, score, line, best_mstart, best_mend, !opt_invert);
 				}
 			}
 			if (opt_max > 0 && matched_count >= (size_t)opt_max)
@@ -655,6 +734,9 @@ main(int argc, char *argv[])
 	int matched = 0, err = 0, show_fname;
 
 	ARGBEGIN {
+	case 'C':
+		opt_color = 1;
+		break;
 	case 'F':
 		opt_patfile = EARGF(usage());
 		break;
@@ -796,7 +878,7 @@ main(int argc, char *argv[])
 	if (h) {
 		heap_sort_descending(h);
 		for (i = 0; i < h->size; i++)
-			print_match(h->items[i].fname, h->items[i].fname != NULL, h->items[i].score, h->items[i].line);
+			print_match(h->items[i].fname, h->items[i].fname != NULL, h->items[i].score, h->items[i].line, h->items[i].mstart, h->items[i].mend, h->items[i].has_span);
 		heap_free(h);
 	}
 
