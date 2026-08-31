@@ -4,6 +4,9 @@
  */
 
 #define _POSIX_C_SOURCE 200809L
+#ifndef __USE_MINGW_ANSI_STDIO
+#define __USE_MINGW_ANSI_STDIO 1
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -833,9 +836,9 @@ main(int argc, char *argv[])
 			puts("(standard input)");
 		if (opt_count && !opt_quiet && !opt_files_with_matches && !opt_files_without_matches) {
 			if (show_fname && fname)
-				printf("%s:%zu\n", fname, cur_count);
+				printf("%s:%lu\n", fname, (unsigned long)cur_count);
 			else
-				printf("%zu\n", cur_count);
+				printf("%lu\n", (unsigned long)cur_count);
 		}
 	} else {
 		for (i = 0; i < (size_t)argc; i++) {
@@ -860,7 +863,7 @@ main(int argc, char *argv[])
 
 			if (opt_count && !opt_quiet && !opt_files_with_matches && !opt_files_without_matches) {
 				if (show_fname)
-					printf("%s:%zu\n", argv[i], cur_count);
+					printf("%s:%lu\n", argv[i], (unsigned long)cur_count);
 				else
 					total_count += cur_count;
 			}
@@ -872,7 +875,7 @@ main(int argc, char *argv[])
 				break;
 		}
 		if (opt_count && !show_fname && !opt_quiet && !opt_files_with_matches && !opt_files_without_matches)
-			printf("%zu\n", total_count);
+			printf("%lu\n", (unsigned long)total_count);
 	}
 
 	if (h) {
