@@ -7,8 +7,8 @@ APPROX="./approx"
 PASSED=0
 FAILED=0
 
-tmp1="/tmp/posix_test_1.$$"
-tmp2="/tmp/posix_test_2.$$"
+tmp1="posix_test_1.$$.tmp"
+tmp2="posix_test_2.$$.tmp"
 trap 'rm -f "$tmp1" "$tmp2"' EXIT INT TERM
 
 run_test() {

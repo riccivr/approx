@@ -108,8 +108,8 @@ run_test "Exact full-line mode (-e) fails word in long line" \
 	""
 
 # Test 10: Multi-file input and stdin
-tmp1="/tmp/approx_test_1.$$"
-tmp2="/tmp/approx_test_2.$$"
+tmp1="approx_test_1.$$.tmp"
+tmp2="approx_test_2.$$.tmp"
 trap 'rm -f "$tmp1" "$tmp2"' EXIT INT TERM
 
 printf "alpha connection\n" > "$tmp1"
@@ -210,7 +210,7 @@ run_test "Max count limits stream output" \
 	"$(printf 'one\ntwo')"
 
 # Test 20: Files with/without matches (-l and -L)
-tmp_pat="/tmp/approx_test_pat.$$"
+tmp_pat="approx_test_pat.$$.tmp"
 trap 'rm -f "$tmp1" "$tmp2" "$tmp_pat"' EXIT INT TERM
 
 run_test "List files with matches (-l)" \
