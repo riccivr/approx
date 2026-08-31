@@ -335,11 +335,11 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 			cost = char_eq(pat[i - 1], c, icase) ? 0 : 1;
 
 			curr[i] = prev[i - 1] + cost;
-			from_start = s_prev[i - 1];
+			from_start = (i == 1) ? j : s_prev[i - 1];
 
 			if (curr[i - 1] + 1 < curr[i]) {
 				curr[i] = curr[i - 1] + 1;
-				from_start = s_curr[i - 1];
+				from_start = (i == 1) ? j : s_curr[i - 1];
 			}
 
 			if (prev[i] + 1 < curr[i]) {
@@ -352,14 +352,14 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 			    char_eq(pat[i - 2], c, icase)) {
 				if (pprev[i - 2] + 1 < curr[i]) {
 					curr[i] = pprev[i - 2] + 1;
-					from_start = s_pprev[i - 2];
+					from_start = (i == 2) ? (j - 1) : s_pprev[i - 2];
 				}
 			}
 
 			s_curr[i] = from_start;
 		}
 
-		if (curr[patlen] < min_dist) {
+		if (curr[patlen] < min_dist || (curr[patlen] == min_dist && min_dist < patlen)) {
 			min_dist = curr[patlen];
 			best_start = s_curr[patlen];
 			best_end = j;

@@ -181,6 +181,94 @@ run_test "Early pipe closure handling (e.g. head -n 1)" \
 	0 \
 	"repeated test match line"
 
+# Test 17: Quiet mode (-q)
+run_test "Quiet mode exits 0 on match with no stdout" \
+	'printf "match line\nother\n" | '"$APPROX"' -q "match"' \
+	0 \
+	""
+
+run_test "Quiet mode exits 1 on no match with no stdout" \
+	'printf "other line\n" | '"$APPROX"' -q "nonexistent"' \
+	1 \
+	""
+
+# Test 18: Count mode (-c)
+run_test "Count mode outputs matching line count" \
+	'printf "match one\nskip\nmatch two\n" | '"$APPROX"' -c "match"' \
+	0 \
+	"2"
+
+run_test "Count mode outputs 0 and exits 1 on no match" \
+	'printf "skip one\nskip two\n" | '"$APPROX"' -c "match"' \
+	1 \
+	"0"
+
+# Test 19: Max matches (-m)
+run_test "Max count limits stream output" \
+	'printf "one\ntwo\nthree\n" | '"$APPROX"' -m 2 -t 0.0 "query"' \
+	0 \
+	"$(printf 'one\ntwo')"
+
+# Test 20: Files with/without matches (-l and -L)
+tmp_pat="/tmp/approx_test_pat.$$"
+trap 'rm -f "$tmp1" "$tmp2" "$tmp_pat"' EXIT INT TERM
+
+run_test "List files with matches (-l)" \
+	''"$APPROX"' -l "alpha" '"$tmp1"' '"$tmp2"'' \
+	0 \
+	"$tmp1"
+
+run_test "List files without matches (-L)" \
+	''"$APPROX"' -L "alpha" '"$tmp1"' '"$tmp2"'' \
+	0 \
+	"$tmp2"
+
+# Test 21: Filename header control (-H and -h)
+run_test "Force filename prefix with -H" \
+	'printf "match\n" | '"$APPROX"' -H "match"' \
+	0 \
+	"(standard input):match"
+
+run_test "Suppress filename prefix with -h" \
+	''"$APPROX"' -H -h "alpha" '"$tmp1"'' \
+	0 \
+	"alpha connection"
+
+# Test 22: Field and delimiter filtering (-k and -d)
+run_test "Delimited CSV field matching (-d, -k 2)" \
+	'printf "101,john_doe,engineer\n102,jane_smith,designer\n" | '"$APPROX"' -d, -k 2 "jhn_doe"' \
+	0 \
+	"101,john_doe,engineer"
+
+run_test "Whitespace field matching (-k 2)" \
+	'printf "2026-08-31 INFO server_start\n2026-08-31 ERROR connection_drop\n" | '"$APPROX"' -k 2 "ERR"' \
+	0 \
+	"2026-08-31 ERROR connection_drop"
+
+# Test 23: Damerau-Levenshtein transposition (-D)
+run_test "Standard Levenshtein fails on transposition at high threshold" \
+	'printf "recieve\n" | '"$APPROX"' -t 0.80 "receive"' \
+	1 \
+	""
+
+run_test "Damerau-Levenshtein succeeds on transposition with -D" \
+	'printf "recieve\n" | '"$APPROX"' -D -t 0.80 "receive"' \
+	0 \
+	"recieve"
+
+# Test 24: Multi-pattern file search (-F)
+printf "database\ntimeout\n" > "$tmp_pat"
+run_test "Multi-pattern search from file (-F)" \
+	'printf "server started\ndatabase error\nnetwork timeout\nother\n" | '"$APPROX"' -F '"$tmp_pat"'' \
+	0 \
+	"$(printf 'database error\nnetwork timeout')"
+
+# Test 25: ANSI color match highlighting (-C)
+run_test "ANSI match highlighting (-C)" \
+	'printf "quick brown fox\n" | '"$APPROX"' -C "brown"' \
+	0 \
+	"$(printf 'quick \033[1;31mbrown\033[0m fox')"
+
 printf "========================================\n"
 printf "Tests passed: %d, Failed: %d\n" "$PASSED" "$FAILED"
 printf "========================================\n"

@@ -81,6 +81,12 @@ run_test "Symmetry of similarity score in exact mode (-e)" \
 	0 \
 	"match"
 
+# Invariant 7: Damerau-Levenshtein score >= Standard Levenshtein score
+run_test "Damerau similarity invariant: sim_D >= sim_L on adjacent transposition" \
+	's_std=$(printf "recieve\n" | '"$APPROX"' -e -t 0.0 -s "receive" | cut -f1); s_dam=$(printf "recieve\n" | '"$APPROX"' -D -e -t 0.0 -s "receive" | cut -f1); awk -v std="$s_std" -v dam="$s_dam" '\''BEGIN { exit !(dam >= std) }'\'' && echo ok' \
+	0 \
+	"ok"
+
 printf "========================================\n"
 printf "Metric Invariants: %d passed, %d failed\n" "$PASSED" "$FAILED"
 printf "========================================\n"
