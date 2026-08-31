@@ -1,6 +1,6 @@
 # Maintainer: Ricardo Veronese Ricci <ricci.vr@gmail.com>
 pkgname=approx
-pkgver=1.0.0
+pkgver=1.1.0
 pkgrel=1
 pkgdesc="Non-interactive fuzzy stream filter and ranker"
 arch=('x86_64' 'aarch64' 'armv7h' 'i686')

@@ -155,7 +155,7 @@ run_test "Missing pattern returns exit code 2" \
 run_test "Version flag outputs version and returns 0" \
 	''"$APPROX"' -V' \
 	0 \
-	"approx-1.0"
+	"approx-1.1.0"
 
 # Test 13: Empty input handling
 run_test "Empty input produces exit code 1" \

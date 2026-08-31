@@ -1,3 +1,9 @@
+approx (1.1.0-1) unstable; urgency=medium
+
+  * New release 1.1.0 with pipeline flags, field targeting, transposition distance, and multi-pattern file search.
+
+ -- Ricardo Veronese Ricci <ricci.vr@gmail.com>  Mon, 31 Aug 2026 21:18:00 +0200
+
 approx (1.0.0-1) unstable; urgency=medium
 
   * Initial release of approx 1.0.0.

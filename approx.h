@@ -9,7 +9,7 @@
 #include <stddef.h>
 
 #ifndef VERSION
-#define VERSION "1.0"
+#define VERSION "1.1.0"
 #endif
 #define DEFAULT_THRESHOLD 0.70
 
