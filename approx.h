@@ -27,8 +27,8 @@ struct heap {
 };
 
 /* string matching */
-double sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int icase);
-double sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int icase);
+double sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int icase, int damerau);
+double sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int icase, int damerau);
 
 /* top-n heap */
 struct heap *heap_create(size_t cap);

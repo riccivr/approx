@@ -75,6 +75,7 @@ static int opt_score = 0;
 static int opt_icase = 0;
 static int opt_invert = 0;
 static int opt_exact = 0;
+static int opt_damerau = 0;
 static int opt_quiet = 0;
 static int opt_count = 0;
 static int opt_files_with_matches = 0;
@@ -107,7 +108,7 @@ die(const char *fmt, ...)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-cehHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] pattern [file ...]\n", argv0);
+	fprintf(stderr, "usage: %s [-cDehHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] pattern [file ...]\n", argv0);
 	exit(2);
 }
 
@@ -173,11 +174,11 @@ char_eq(char a, char b, int icase)
 }
 
 double
-sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int icase)
+sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int icase, int damerau)
 {
-	size_t buf_a[256], buf_b[256];
-	size_t *prev, *curr, *tmp;
-	size_t *alloc_a = NULL, *alloc_b = NULL;
+	size_t buf_a[256], buf_b[256], buf_c[256];
+	size_t *pprev, *prev, *curr, *tmp;
+	size_t *alloc_a = NULL, *alloc_b = NULL, *alloc_c = NULL;
 	size_t min_dist, cost;
 	size_t i, j;
 	char c;
@@ -191,22 +192,28 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 		die("approx: pattern too long");
 
 	if (patlen + 1 <= sizeof(buf_a) / sizeof(buf_a[0])) {
-		prev = buf_a;
-		curr = buf_b;
+		pprev = buf_a;
+		prev = buf_b;
+		curr = buf_c;
 	} else {
 		alloc_a = malloc((patlen + 1) * sizeof(size_t));
 		alloc_b = malloc((patlen + 1) * sizeof(size_t));
-		if (!alloc_a || !alloc_b) {
+		alloc_c = malloc((patlen + 1) * sizeof(size_t));
+		if (!alloc_a || !alloc_b || !alloc_c) {
 			free(alloc_a);
 			free(alloc_b);
+			free(alloc_c);
 			die("approx: out of memory");
 		}
-		prev = alloc_a;
-		curr = alloc_b;
+		pprev = alloc_a;
+		prev = alloc_b;
+		curr = alloc_c;
 	}
 
-	for (i = 0; i <= patlen; i++)
+	for (i = 0; i <= patlen; i++) {
 		prev[i] = i;
+		pprev[i] = i;
+	}
 
 	min_dist = patlen;
 
@@ -219,12 +226,19 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 			curr[i] = min3(curr[i - 1] + 1,
 			               prev[i] + 1,
 			               prev[i - 1] + cost);
+			if (damerau && j > 0 && i > 1 &&
+			    char_eq(pat[i - 1], line[j - 1], icase) &&
+			    char_eq(pat[i - 2], c, icase)) {
+				if (pprev[i - 2] + 1 < curr[i])
+					curr[i] = pprev[i - 2] + 1;
+			}
 		}
 
 		if (curr[patlen] < min_dist)
 			min_dist = curr[patlen];
 
-		tmp = prev;
+		tmp = pprev;
+		pprev = prev;
 		prev = curr;
 		curr = tmp;
 	}
@@ -232,6 +246,7 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 	if (alloc_a) {
 		free(alloc_a);
 		free(alloc_b);
+		free(alloc_c);
 	}
 
 	if (min_dist >= patlen)
@@ -241,11 +256,11 @@ sim_substr(const char *pat, size_t patlen, const char *line, size_t linelen, int
 }
 
 double
-sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int icase)
+sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int icase, int damerau)
 {
-	size_t buf_a[256], buf_b[256];
-	size_t *prev, *curr, *tmp;
-	size_t *alloc_a = NULL, *alloc_b = NULL;
+	size_t buf_a[256], buf_b[256], buf_c[256];
+	size_t *pprev, *prev, *curr, *tmp;
+	size_t *alloc_a = NULL, *alloc_b = NULL, *alloc_c = NULL;
 	size_t dist, max_len, cost;
 	size_t i, j;
 	char c;
@@ -259,22 +274,28 @@ sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int 
 		die("approx: pattern too long");
 
 	if (patlen + 1 <= sizeof(buf_a) / sizeof(buf_a[0])) {
-		prev = buf_a;
-		curr = buf_b;
+		pprev = buf_a;
+		prev = buf_b;
+		curr = buf_c;
 	} else {
 		alloc_a = malloc((patlen + 1) * sizeof(size_t));
 		alloc_b = malloc((patlen + 1) * sizeof(size_t));
-		if (!alloc_a || !alloc_b) {
+		alloc_c = malloc((patlen + 1) * sizeof(size_t));
+		if (!alloc_a || !alloc_b || !alloc_c) {
 			free(alloc_a);
 			free(alloc_b);
+			free(alloc_c);
 			die("approx: out of memory");
 		}
-		prev = alloc_a;
-		curr = alloc_b;
+		pprev = alloc_a;
+		prev = alloc_b;
+		curr = alloc_c;
 	}
 
-	for (i = 0; i <= patlen; i++)
+	for (i = 0; i <= patlen; i++) {
 		prev[i] = i;
+		pprev[i] = i;
+	}
 
 	for (j = 0; j < linelen; j++) {
 		c = line[j];
@@ -285,9 +306,16 @@ sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int 
 			curr[i] = min3(curr[i - 1] + 1,
 			               prev[i] + 1,
 			               prev[i - 1] + cost);
+			if (damerau && j > 0 && i > 1 &&
+			    char_eq(pat[i - 1], line[j - 1], icase) &&
+			    char_eq(pat[i - 2], c, icase)) {
+				if (pprev[i - 2] + 1 < curr[i])
+					curr[i] = pprev[i - 2] + 1;
+			}
 		}
 
-		tmp = prev;
+		tmp = pprev;
+		pprev = prev;
 		prev = curr;
 		curr = tmp;
 	}
@@ -297,6 +325,7 @@ sim_exact(const char *pat, size_t patlen, const char *line, size_t linelen, int 
 	if (alloc_a) {
 		free(alloc_a);
 		free(alloc_b);
+		free(alloc_c);
 	}
 
 	max_len = patlen > linelen ? patlen : linelen;
@@ -493,9 +522,9 @@ process_stream(FILE *fp, const char *fname, int show_fname, const char *pat, siz
 			extract_field(line, len, opt_delim, opt_field, &match_tgt, &match_len);
 
 		if (opt_exact)
-			score = sim_exact(pat, patlen, match_tgt, match_len, opt_icase);
+			score = sim_exact(pat, patlen, match_tgt, match_len, opt_icase, opt_damerau);
 		else
-			score = sim_substr(pat, patlen, match_tgt, match_len, opt_icase);
+			score = sim_substr(pat, patlen, match_tgt, match_len, opt_icase, opt_damerau);
 
 		is_match = opt_invert ? (score < threshold) : (score >= threshold);
 
@@ -536,6 +565,9 @@ main(int argc, char *argv[])
 	int matched = 0, err = 0, show_fname;
 
 	ARGBEGIN {
+	case 'D':
+		opt_damerau = 1;
+		break;
 	case 'd':
 		s = EARGF(usage());
 		if (strlen(s) != 1)
