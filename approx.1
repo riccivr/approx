@@ -3,18 +3,26 @@
 approx \- non-interactive fuzzy stream filter and ranker
 .SH SYNOPSIS
 .B approx
-.RB [ \-isveV ]
+.RB [ \-cCDehHilLmqsvV ]
 .RB [ \-t
 .IR threshold ]
 .RB [ \-n
 .IR count ]
-.I pattern
+.RB [ \-m
+.IR max ]
+.RB [ \-d
+.IR delim ]
+.RB [ \-k
+.IR field ]
+.RB [ \-F
+.IR file ]
+.RI [ pattern ]
 .RI [ file\ ... ]
 .SH DESCRIPTION
 .B approx
 filters and ranks text lines by comparing them against a search
 .I pattern
-using approximate string matching.
+(or a list of patterns from a file) using approximate string matching.
 .P
 If no
 .I file
@@ -24,6 +32,64 @@ operands are specified, or if a file operand is
 reads from standard input.
 .SH OPTIONS
 .TP
+.B \-c
+Output only the count of matching lines.
+.TP
+.B \-C
+Highlight the matched substring using ANSI escape sequences.
+.TP
+.BI \-d " delim"
+Set the field delimiter character for
+.BR \-k .
+Default is whitespace.
+.TP
+.B \-D
+Enable Damerau-Levenshtein distance to count adjacent character transpositions as 1 edit.
+.TP
+.B \-e
+Compare full lines instead of finding the best matching substring.
+.TP
+.BI \-F " file"
+Read search patterns from
+.IR file ,
+one per line.
+.TP
+.B \-h
+Never print filename prefixes in output.
+.TP
+.B \-H
+Print the filename prefix for each match.
+.TP
+.B \-i
+Match case-insensitively.
+.TP
+.BI \-k " field"
+Compare similarity against 1-based field number
+.I field
+while printing the full line.
+.TP
+.B \-l
+Print only names of files with matching lines.
+.TP
+.B \-L
+Print only names of files without matching lines.
+.TP
+.BI \-m " max"
+Stop reading after finding
+.I max
+matching lines.
+.TP
+.BI \-n " count"
+Output only the top
+.I count
+lines sorted by highest similarity score.
+.TP
+.B \-q
+Quiet mode. Suppress standard output and exit immediately on the first match.
+.TP
+.B \-s
+Prepend the similarity score and a tab character before each matching line.
+.TP
 .BI \-t " threshold"
 Minimum similarity score between
 .B 0.00
@@ -32,22 +98,8 @@ and
 for a line to match. Default is
 .BR 0.70 .
 .TP
-.BI \-n " count"
-Output only the top
-.I count
-lines sorted by highest similarity score.
-.TP
-.B \-s
-Prepend the similarity score and a tab character before each matching line.
-.TP
-.B \-i
-Match case-insensitively.
-.TP
 .B \-v
 Invert match, selecting lines with scores below the threshold.
-.TP
-.B \-e
-Compare full lines instead of finding the best matching substring.
 .TP
 .B \-V
 Print version information to standard output and exit.
@@ -68,16 +120,28 @@ Filter log lines for typos in "connection timeout":
 cat server.log | approx "connection timeout"
 .EE
 .P
-Find the top 5 closest matches from a wordlist:
+Search column 2 of a CSV file for typoed names:
+.IP
+.EX
+approx -d, -k 2 "john_doe" users.csv
+.EE
+.P
+Tolerate swapped letters with Damerau-Levenshtein:
+.IP
+.EX
+approx -D -t 0.85 "receive" /usr/share/dict/words
+.EE
+.P
+Check condition in shell scripts quietly:
+.IP
+.EX
+if approx -q "FATAL" /var/log/app.log; then echo "error found"; fi
+.EE
+.P
+Find the top 5 closest matches with scores:
 .IP
 .EX
 approx -n 5 -s "recieve" /usr/share/dict/words
-.EE
-.P
-Case-insensitive search with an 85% threshold:
-.IP
-.EX
-dmesg | approx -i -t 0.85 "out of memory"
 .EE
 .SH AUTHORS
 See the LICENSE file for authors and copyright details.

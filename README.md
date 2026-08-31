@@ -16,6 +16,10 @@ Features
 * Streams line by line without loading the input into memory.
 * Bounded min-heap for top-N ranking.
 * POSIX argument parsing and exit codes.
+* Target specific columns with custom field delimiters.
+* Damerau-Levenshtein transposition support.
+* Multi-pattern search from files.
+* ANSI color match highlighting.
 * Works on Linux, macOS, BSD, and Windows.
 
 Installation
@@ -91,13 +95,25 @@ metric invariants, sanitizers, and throughput:
 Usage
 -----
 ```
-approx [-isveV] [-t threshold] [-n count] pattern [file ...]
+approx [-cCDhHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] [-F file] [pattern] [file ...]
 ```
 
 ### Options
 * `-t threshold`: Minimum similarity score from 0.00 to 1.00 (default: 0.70).
 * `-n count`: Output only the top N matches sorted by score.
-* `-s`: Prefix matching lines with their score (0.XX\t<line>).
+* `-m max`: Stop reading after finding `max` matches.
+* `-q`: Quiet mode; exit 0 on first match, exit 1 on no match, suppress standard output.
+* `-c`: Output only the count of matching lines.
+* `-l`: Print only names of files with matching lines.
+* `-L`: Print only names of files without matching lines.
+* `-H`: Print filename prefix for each match.
+* `-h`: Suppress filename prefix in output.
+* `-k field`: Compare similarity against 1-based field number while outputting the full line.
+* `-d delim`: Delimiter character for `-k` (default: whitespace).
+* `-D`: Enable Damerau-Levenshtein distance (adjacent transposition counts as 1 edit).
+* `-F file`: Read search patterns from `file`, one per line.
+* `-C`: Highlight matched substrings with ANSI colors.
+* `-s`: Prefix matching lines with their score (`0.XX\t<line>`).
 * `-i`: Case-insensitive matching.
 * `-v`: Invert match (select lines below threshold).
 * `-e`: Compare full lines instead of finding the best matching substring.
@@ -114,14 +130,24 @@ Filter log lines for typos in "connection timeout":
 
     cat server.log | approx "connection timeout"
 
+Target column 2 of a CSV file for typoed user names:
+
+    approx -d, -k 2 "john_doe" users.csv
+
+Tolerate swapped letters with Damerau-Levenshtein:
+
+    approx -D -t 0.85 "receive" /usr/share/dict/words
+
+Quiet check in shell conditionals:
+
+    if approx -q "FATAL" /var/log/syslog; then
+        notify-send "Server error detected"
+    fi
+
 Find the top 5 closest matches from a wordlist:
 
     approx -n 5 -s "recieve" /usr/share/dict/words
 
-Case-insensitive search with an 85% threshold:
+Search against multiple patterns from a file:
 
-    dmesg | approx -i -t 0.85 "out of memory"
-
-Rank log errors in a stream:
-
-    journalctl -u nginx -f | approx -t 0.80 "bad gateway"
+    approx -F patterns.txt server.log
