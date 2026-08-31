@@ -3,7 +3,7 @@ class Approx < Formula
   homepage "https://github.com/riccivr/approx"
   url "https://github.com/riccivr/approx/archive/refs/tags/v1.1.0.tar.gz"
   sha256 "SKIP" # Replace with tag tarball sha256
-  license "ISC"
+  license "MIT"
   head "https://github.com/riccivr/approx.git", branch: "main"
 
   def install
