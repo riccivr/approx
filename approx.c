@@ -85,6 +85,14 @@ static long opt_topn = 0;
 static long opt_max = 0;
 static char opt_delim = '\0';
 static long opt_field = 0;
+static char *opt_patfile = NULL;
+
+struct pattern_list {
+	char **patterns;
+	size_t *patlens;
+	size_t count;
+	size_t cap;
+};
 
 static void
 die(const char *fmt, ...)
@@ -108,8 +116,84 @@ die(const char *fmt, ...)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-cDehHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] pattern [file ...]\n", argv0);
+	fprintf(stderr, "usage: %s [-cDehHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] [-F file] [pattern] [file ...]\n", argv0);
 	exit(2);
+}
+
+static void
+pattern_list_add(struct pattern_list *pl, const char *pat, size_t len)
+{
+	char *dup;
+	char **new_pats;
+	size_t *new_lens;
+	size_t new_cap;
+
+	if (pl->count >= pl->cap) {
+		new_cap = pl->cap ? pl->cap * 2 : 8;
+		new_pats = realloc(pl->patterns, new_cap * sizeof(char *));
+		new_lens = realloc(pl->patlens, new_cap * sizeof(size_t));
+		if (!new_pats || !new_lens)
+			die("approx: out of memory");
+		pl->patterns = new_pats;
+		pl->patlens = new_lens;
+		pl->cap = new_cap;
+	}
+
+	dup = malloc(len + 1);
+	if (!dup)
+		die("approx: out of memory");
+	memcpy(dup, pat, len);
+	dup[len] = '\0';
+
+	pl->patterns[pl->count] = dup;
+	pl->patlens[pl->count] = len;
+	pl->count++;
+}
+
+static void
+pattern_list_free(struct pattern_list *pl)
+{
+	size_t i;
+
+	if (!pl)
+		return;
+
+	for (i = 0; i < pl->count; i++)
+		free(pl->patterns[i]);
+
+	free(pl->patterns);
+	free(pl->patlens);
+	pl->patterns = NULL;
+	pl->patlens = NULL;
+	pl->count = 0;
+	pl->cap = 0;
+}
+
+static void
+load_pattern_file(struct pattern_list *pl, const char *path)
+{
+	FILE *fp;
+	char *line = NULL;
+	size_t linecap = 0;
+	ssize_t linelen;
+	size_t len;
+
+	fp = fopen(path, "r");
+	if (!fp)
+		die("approx: %s: %s", path, strerror(errno));
+
+	while ((linelen = getline(&line, &linecap, fp)) >= 0) {
+		len = (size_t)linelen;
+		while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
+			line[--len] = '\0';
+		pattern_list_add(pl, line, len);
+	}
+
+	free(line);
+	fclose(fp);
+
+	if (pl->count == 0)
+		die("approx: %s: pattern file is empty", path);
 }
 
 static void
@@ -497,14 +581,14 @@ print_match(const char *fname, int show_fname, double score, const char *line)
 }
 
 static int
-process_stream(FILE *fp, const char *fname, int show_fname, const char *pat, size_t patlen, struct heap *h, size_t *count_out)
+process_stream(FILE *fp, const char *fname, int show_fname, const struct pattern_list *pl, struct heap *h, size_t *count_out)
 {
 	char *line = NULL;
 	const char *match_tgt;
 	size_t linecap = 0;
 	ssize_t linelen;
-	size_t lineno = 0, len, match_len, matched_count = 0;
-	double score;
+	size_t lineno = 0, len, match_len, matched_count = 0, p;
+	double score, cur_score;
 	int matched = 0, is_match;
 
 	while ((linelen = getline(&line, &linecap, fp)) >= 0) {
@@ -521,10 +605,15 @@ process_stream(FILE *fp, const char *fname, int show_fname, const char *pat, siz
 		if (opt_field > 0)
 			extract_field(line, len, opt_delim, opt_field, &match_tgt, &match_len);
 
-		if (opt_exact)
-			score = sim_exact(pat, patlen, match_tgt, match_len, opt_icase, opt_damerau);
-		else
-			score = sim_substr(pat, patlen, match_tgt, match_len, opt_icase, opt_damerau);
+		score = -1.0;
+		for (p = 0; p < pl->count; p++) {
+			if (opt_exact)
+				cur_score = sim_exact(pl->patterns[p], pl->patlens[p], match_tgt, match_len, opt_icase, opt_damerau);
+			else
+				cur_score = sim_substr(pl->patterns[p], pl->patlens[p], match_tgt, match_len, opt_icase, opt_damerau);
+			if (cur_score > score)
+				score = cur_score;
+		}
 
 		is_match = opt_invert ? (score < threshold) : (score >= threshold);
 
@@ -559,12 +648,16 @@ int
 main(int argc, char *argv[])
 {
 	FILE *fp;
-	char *pat, *s, *end;
-	size_t patlen, i, cur_count, total_count = 0;
+	char *s, *end;
+	size_t i, cur_count, total_count = 0;
+	struct pattern_list pl = {0};
 	struct heap *h = NULL;
 	int matched = 0, err = 0, show_fname;
 
 	ARGBEGIN {
+	case 'F':
+		opt_patfile = EARGF(usage());
+		break;
 	case 'D':
 		opt_damerau = 1;
 		break;
@@ -635,13 +728,15 @@ main(int argc, char *argv[])
 		usage();
 	} ARGEND;
 
-	if (argc < 1)
-		usage();
-
-	pat = argv[0];
-	patlen = strlen(pat);
-	argc--;
-	argv++;
+	if (opt_patfile) {
+		load_pattern_file(&pl, opt_patfile);
+	} else {
+		if (argc < 1)
+			usage();
+		pattern_list_add(&pl, argv[0], strlen(argv[0]));
+		argc--;
+		argv++;
+	}
 
 	show_fname = (opt_header == 1);
 
@@ -650,7 +745,7 @@ main(int argc, char *argv[])
 
 	if (argc == 0) {
 		const char *fname = (show_fname) ? "(standard input)" : NULL;
-		if (process_stream(stdin, fname, show_fname, pat, patlen, h, &cur_count))
+		if (process_stream(stdin, fname, show_fname, &pl, h, &cur_count))
 			matched = 1;
 		if (opt_files_without_matches && cur_count == 0 && !opt_quiet)
 			puts("(standard input)");
@@ -675,7 +770,7 @@ main(int argc, char *argv[])
 				}
 			}
 
-			if (process_stream(fp, argv[i], show_fname, pat, patlen, h, &cur_count))
+			if (process_stream(fp, argv[i], show_fname, &pl, h, &cur_count))
 				matched = 1;
 
 			if (opt_files_without_matches && cur_count == 0 && !opt_quiet)
@@ -704,6 +799,8 @@ main(int argc, char *argv[])
 			print_match(h->items[i].fname, h->items[i].fname != NULL, h->items[i].score, h->items[i].line);
 		heap_free(h);
 	}
+
+	pattern_list_free(&pl);
 
 	if (fflush(stdout) == EOF || ferror(stdout)) {
 		if (errno != EPIPE)
