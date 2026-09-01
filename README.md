@@ -141,8 +141,8 @@ approx [-cCDehHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field
 * `-c`: Output only the count of matching lines.
 * `-l`: Print only names of files with matching lines.
 * `-L`: Print only names of files without matching lines.
-* `-H`: Print filename prefix for each match.
-* `-h`: Suppress filename prefix in output.
+* `-H`: Print filename prefix for each match (default when 2 or more files are passed).
+* `-h`: Suppress filename prefix in output (not help).
 * `-k field`: Compare similarity against 1-based field number while outputting the full line.
 * `-d delim`: Delimiter character for `-k` (default: whitespace).
 * `-D`: Enable Damerau-Levenshtein distance (adjacent transposition counts as 1 edit).

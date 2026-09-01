@@ -48,6 +48,10 @@ portable_getline(char **lineptr, size_t *n, FILE *stream)
 	buf = *lineptr;
 	while ((c = fgetc(stream)) != EOF) {
 		if (pos + 2 >= *n) {
+			if (*n > SIZE_MAX / 2) {
+				errno = ENOMEM;
+				return -1;
+			}
 			size_t new_size = *n * 2;
 			char *new_buf = (char *)realloc(buf, new_size);
 			if (!new_buf) {
@@ -119,7 +123,8 @@ die(const char *fmt, ...)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-cCDehHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] [-F file] [pattern] [file ...]\n", argv0);
+	fprintf(stderr, "usage: %s [-cCDehHilLmqsvV] [-t threshold] [-n count] [-m max] [-d delim] [-k field] [-F file] [pattern] [file ...]\n"
+	                "       -h suppresses filename prefix (not help)\n", argv0);
 	exit(2);
 }
 
@@ -135,15 +140,24 @@ pattern_list_add(struct pattern_list *pl, const char *pat, size_t len)
 		return;
 
 	if (pl->count >= pl->cap) {
+		if (pl->cap > SIZE_MAX / 2 / sizeof(char *) ||
+		    pl->cap > SIZE_MAX / 2 / sizeof(size_t))
+			die("approx: out of memory");
 		new_cap = pl->cap ? pl->cap * 2 : 8;
-		new_pats = (char **)realloc(pl->patterns, new_cap * sizeof(char *));
-		if (!new_pats)
+		new_pats = (char **)malloc(new_cap * sizeof(char *));
+		new_lens = (size_t *)malloc(new_cap * sizeof(size_t));
+		if (!new_pats || !new_lens) {
+			free(new_pats);
+			free(new_lens);
 			die("approx: out of memory");
+		}
+		if (pl->count > 0) {
+			memcpy(new_pats, pl->patterns, pl->count * sizeof(char *));
+			memcpy(new_lens, pl->patlens, pl->count * sizeof(size_t));
+		}
+		free(pl->patterns);
+		free(pl->patlens);
 		pl->patterns = new_pats;
-
-		new_lens = (size_t *)realloc(pl->patlens, new_cap * sizeof(size_t));
-		if (!new_lens)
-			die("approx: out of memory");
 		pl->patlens = new_lens;
 		pl->cap = new_cap;
 	}

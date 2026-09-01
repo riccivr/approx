@@ -30,6 +30,12 @@ operands are specified, or if a file operand is
 .BR \- ,
 .B approx
 reads from standard input.
+.P
+If two or more
+.I file
+operands are specified,
+.B approx
+automatically prefixes matching lines with their corresponding filename (grep-compatible behavior).
 .SH OPTIONS
 .TP
 .B \-c
@@ -55,10 +61,10 @@ Read search patterns from
 one per line.
 .TP
 .B \-h
-Never print filename prefixes in output.
+Never print filename prefixes in output (suppress filename prefix, not help).
 .TP
 .B \-H
-Print the filename prefix for each match.
+Print the filename prefix for each match. Default when two or more file operands are specified.
 .TP
 .B \-i
 Match case-insensitively.

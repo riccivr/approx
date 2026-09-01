@@ -275,9 +275,9 @@ run_test "Empty search pattern returns exit code 2" \
 	2 \
 	""
 
-# Test 27: Usage string contains -e
-run_test "Usage output contains -e flag" \
-	''"$APPROX"' 2>&1 | grep -q -- "-cCDehHilLmqsvV" && echo "ok"' \
+# Test 27: Usage string contains -e and -h clarification
+run_test "Usage output contains -e flag and -h not help note" \
+	''"$APPROX"' 2>&1 | grep -q -- "-cCDehHilLmqsvV" && '"$APPROX"' 2>&1 | grep -q "not help" && echo "ok"' \
 	0 \
 	"ok"
 
@@ -286,6 +286,21 @@ run_test "Single file input does not prefix filename by default" \
 	''"$APPROX"' "connection" '"$tmp1"'' \
 	0 \
 	"alpha connection"
+
+# Test 29: Pattern file with only blank lines exits 2
+tmp_blank="approx_test_blank.$$.tmp"
+trap 'rm -f "$tmp1" "$tmp2" "$tmp_pat" "$tmp_blank"' EXIT INT TERM
+printf "\n\n\n" > "$tmp_blank"
+run_test "Pattern file with only blank lines returns exit code 2" \
+	''"$APPROX"' -F '"$tmp_blank"' '"$tmp1"'' \
+	2 \
+	""
+
+# Test 30: Non-existent pattern file returns exit code 2
+run_test "Non-existent pattern file returns exit code 2" \
+	''"$APPROX"' -F "/tmp/nonexistent_pat_$$" '"$tmp1"'' \
+	2 \
+	""
 
 printf "========================================\n"
 printf "Tests passed: %d, Failed: %d\n" "$PASSED" "$FAILED"
